@@ -17,7 +17,6 @@
 package org.apache.logging.log4j.core.pattern;
 
 import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.ThreadContext;
 import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.LoggerContext;
@@ -36,10 +35,13 @@ public class RegexReplacementConverterTest {
     @Test
     public void testReplacement() {
         ThreadContext.put("MyKey", "Apache");
-        final LogEvent event = new Log4jLogEvent(RegexReplacementConverterTest.class.getName(), null, null,
-            Level.DEBUG, new SimpleMessage("This is a test"), null);
+        final LogEvent event = Log4jLogEvent.newBuilder() //
+                .setLoggerName(RegexReplacementConverterTest.class.getName()) //
+                .setLevel(Level.DEBUG) //
+                .setMessage(new SimpleMessage("This is a test")) //
+                .build();
         final StringBuilder sb = new StringBuilder();
-        final LoggerContext ctx = (LoggerContext) LogManager.getContext();
+        final LoggerContext ctx = LoggerContext.getContext();
         final String[] options = new String[] {
             "%logger %msg%n", "\\.", "/"
         };

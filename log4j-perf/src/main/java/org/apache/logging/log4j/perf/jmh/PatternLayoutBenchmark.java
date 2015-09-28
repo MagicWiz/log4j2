@@ -58,14 +58,14 @@ public class PatternLayoutBenchmark {
     private static final String DEFAULT_ENCODING = CHARSET_DEFAULT.name();
     private static final String STRING_SHIFT_JIS = "SHIFT_JIS";
     private static final Charset CHARSET_SHIFT_JIS = Charset.forName(STRING_SHIFT_JIS);
-    private final PatternLayout PATTERN_M = PatternLayout.createLayout("%m%n", null, null, CHARSET_DEFAULT, false, true, null, null);
-    private final PatternLayout PATTERN_SPACE = PatternLayout.createLayout(" ", null, null, CHARSET_DEFAULT, false, true, null, null);
-    private final PatternLayout PATTERN_M_C = PatternLayout.createLayout("%c %m%n", null, null, CHARSET_DEFAULT, false, true, null, null);
-    private final PatternLayout PATTERN_M_C_D = PatternLayout.createLayout("%d %c %m%n", null, null, CHARSET_DEFAULT, false, true, null, null);
-    private final PatternLayout PATTERN_M_D = PatternLayout.createLayout("%d %m%n", null, null, CHARSET_DEFAULT, false, true, null, null);
-    private final PatternLayout PATTERN_M_EX = PatternLayout.createLayout("%m %ex%n", null, null, CHARSET_DEFAULT, false, true, null, null);
-    private final PatternLayout PATTERN_M_D_EX = PatternLayout.createLayout("%d %m%ex%n", null, null, CHARSET_DEFAULT, false, true, null, null);
-    private final PatternLayout PATTERN_M_C_D_EX = PatternLayout.createLayout("%d %c %m%ex%n", null, null, CHARSET_DEFAULT, false, true, null, null);
+    private final PatternLayout PATTERN_M = PatternLayout.createLayout("%m%n", null, null, null, CHARSET_DEFAULT, false, true, null, null);
+    private final PatternLayout PATTERN_SPACE = PatternLayout.createLayout(" ", null, null, null, CHARSET_DEFAULT, false, true, null, null);
+    private final PatternLayout PATTERN_M_C = PatternLayout.createLayout("%c %m%n", null, null, null, CHARSET_DEFAULT, false, true, null, null);
+    private final PatternLayout PATTERN_M_C_D = PatternLayout.createLayout("%d %c %m%n", null, null, null, CHARSET_DEFAULT, false, true, null, null);
+    private final PatternLayout PATTERN_M_D = PatternLayout.createLayout("%d %m%n", null, null, null, CHARSET_DEFAULT, false, true, null, null);
+    private final PatternLayout PATTERN_M_EX = PatternLayout.createLayout("%m %ex%n", null, null, null, CHARSET_DEFAULT, false, true, null, null);
+    private final PatternLayout PATTERN_M_D_EX = PatternLayout.createLayout("%d %m%ex%n", null, null, null, CHARSET_DEFAULT, false, true, null, null);
+    private final PatternLayout PATTERN_M_C_D_EX = PatternLayout.createLayout("%d %c %m%ex%n", null, null, null, CHARSET_DEFAULT, false, true, null, null);
 
     private static LogEvent createLogEvent() {
         final Marker marker = null;
@@ -79,8 +79,19 @@ public class PatternLayoutBenchmark {
         final StackTraceElement location = null;
         final long timestamp = 12345678;
 
-        return new Log4jLogEvent("name(ignored)", marker, fqcn, level, message, t, mdc, ndc, threadName, location,
-                timestamp);
+        return Log4jLogEvent.newBuilder() //
+                .setLoggerName("name(ignored)") //
+                .setMarker(marker) //
+                .setLoggerFqcn(fqcn) //
+                .setLevel(level) //
+                .setMessage(message) //
+                .setThrown(t) //
+                .setContextMap(mdc) //
+                .setContextStack(ndc) //
+                .setThreadName(threadName) //
+                .setSource(location) //
+                .setTimeMillis(timestamp) //
+                .build();
     }
 
     @Benchmark

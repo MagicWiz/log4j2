@@ -17,6 +17,7 @@
 package org.apache.logging.log4j.core.async;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -26,12 +27,15 @@ import org.apache.logging.log4j.ThreadContext;
 import org.apache.logging.log4j.core.Logger;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.Property;
+import org.apache.logging.log4j.core.config.ReliabilityStrategy;
 import org.apache.logging.log4j.core.impl.Log4jLogEvent;
 import org.apache.logging.log4j.core.jmx.RingBufferAdmin;
 import org.apache.logging.log4j.core.util.Clock;
 import org.apache.logging.log4j.core.util.ClockFactory;
+import org.apache.logging.log4j.core.util.DummyNanoClock;
 import org.apache.logging.log4j.core.util.Integers;
 import org.apache.logging.log4j.core.util.Loader;
+import org.apache.logging.log4j.core.util.NanoClock;
 import org.apache.logging.log4j.message.Message;
 import org.apache.logging.log4j.message.MessageFactory;
 import org.apache.logging.log4j.message.TimestampMessage;
@@ -48,32 +52,23 @@ import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 
 /**
- * AsyncLogger is a logger designed for high throughput and low latency logging.
- * It does not perform any I/O in the calling (application) thread, but instead
- * hands off the work to another thread as soon as possible. The actual logging
- * is performed in the background thread. It uses the LMAX Disruptor library for
- * inter-thread communication. (<a
- * href="http://lmax-exchange.github.com/disruptor/"
- * >http://lmax-exchange.github.com/disruptor/</a>)
+ * AsyncLogger is a logger designed for high throughput and low latency logging. It does not perform any I/O in the
+ * calling (application) thread, but instead hands off the work to another thread as soon as possible. The actual
+ * logging is performed in the background thread. It uses the LMAX Disruptor library for inter-thread communication. (<a
+ * href="http://lmax-exchange.github.com/disruptor/" >http://lmax-exchange.github.com/disruptor/</a>)
  * <p>
  * To use AsyncLogger, specify the System property
- * {@code -DLog4jContextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector}
- * before you obtain a Logger, and all Loggers returned by LogManager.getLogger
- * will be AsyncLoggers.
+ * {@code -DLog4jContextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector} before you obtain a
+ * Logger, and all Loggers returned by LogManager.getLogger will be AsyncLoggers.
  * <p>
- * Note that for performance reasons, this logger does not include source
- * location by default. You need to specify {@code includeLocation="true"} in
- * the configuration or any %class, %location or %line conversion patterns in
- * your log4j.xml configuration will produce either a "?" character or no output
- * at all.
+ * Note that for performance reasons, this logger does not include source location by default. You need to specify
+ * {@code includeLocation="true"} in the configuration or any %class, %location or %line conversion patterns in your
+ * log4j.xml configuration will produce either a "?" character or no output at all.
  * <p>
- * For best performance, use AsyncLogger with the RandomAccessFileAppender or
- * RollingRandomAccessFileAppender, with immediateFlush=false. These appenders
- * have built-in support for the batching mechanism used by the Disruptor
- * library, and they will flush to disk at the end of each batch. This means
- * that even with immediateFlush=false, there will never be any items left in
- * the buffer; all log events will all be written to disk in a very efficient
- * manner.
+ * For best performance, use AsyncLogger with the RandomAccessFileAppender or RollingRandomAccessFileAppender, with
+ * immediateFlush=false. These appenders have built-in support for the batching mechanism used by the Disruptor library,
+ * and they will flush to disk at the end of each batch. This means that even with immediateFlush=false, there will
+ * never be any items left in the buffer; all log events will all be written to disk in a very efficient manner.
  */
 public class AsyncLogger extends Logger {
     private static final long serialVersionUID = 1L;
@@ -83,8 +78,10 @@ public class AsyncLogger extends Logger {
     private static final int RINGBUFFER_DEFAULT_SIZE = 256 * 1024;
     private static final StatusLogger LOGGER = StatusLogger.getLogger();
     private static final ThreadNameStrategy THREAD_NAME_STRATEGY = ThreadNameStrategy.create();
-    private static final ThreadLocal<Info> threadlocalInfo = new ThreadLocal<>();
 
+    /**
+     * Strategy for deciding whether thread name should be cached or not.
+     */
     static enum ThreadNameStrategy { // LOG4J2-467
         CACHED {
             @Override
@@ -101,7 +98,8 @@ public class AsyncLogger extends Logger {
         abstract String getThreadName(Info info);
 
         static ThreadNameStrategy create() {
-            final String name = PropertiesUtil.getProperties().getStringProperty("AsyncLogger.ThreadNameStrategy", CACHED.name());
+            final String name = PropertiesUtil.getProperties().getStringProperty("AsyncLogger.ThreadNameStrategy",
+                    CACHED.name());
             try {
                 return ThreadNameStrategy.valueOf(name);
             } catch (final Exception ex) {
@@ -110,11 +108,13 @@ public class AsyncLogger extends Logger {
             }
         }
     }
-    private static volatile Disruptor<RingBufferLogEvent> disruptor;
-    private static final Clock clock = ClockFactory.getClock();
 
-    private static final ExecutorService executor = Executors
-            .newSingleThreadExecutor(new DaemonThreadFactory("AsyncLogger-"));
+    private static volatile Disruptor<RingBufferLogEvent> disruptor;
+    private static final Clock CLOCK = ClockFactory.getClock();
+    private static volatile NanoClock nanoClock = new DummyNanoClock();
+
+    private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(new DaemonThreadFactory(
+            "AsyncLogger-"));
 
     static {
         initInfoForExecutorThread();
@@ -122,7 +122,7 @@ public class AsyncLogger extends Logger {
         final int ringBufferSize = calculateRingBufferSize();
 
         final WaitStrategy waitStrategy = createWaitStrategy();
-        disruptor = new Disruptor<>(RingBufferLogEvent.FACTORY, ringBufferSize, executor, ProducerType.MULTI,
+        disruptor = new Disruptor<>(RingBufferLogEvent.FACTORY, ringBufferSize, EXECUTOR, ProducerType.MULTI,
                 waitStrategy);
         disruptor.handleExceptionsWith(getExceptionHandler());
         disruptor.handleEventsWith(new RingBufferLogEventHandler());
@@ -132,10 +132,21 @@ public class AsyncLogger extends Logger {
         disruptor.start();
     }
 
+    /**
+     * Constructs an {@code AsyncLogger} with the specified context, name and message factory.
+     *
+     * @param context context of this logger
+     * @param name name of this logger
+     * @param messageFactory message factory of this logger
+     */
+    public AsyncLogger(final LoggerContext context, final String name, final MessageFactory messageFactory) {
+        super(context, name, messageFactory);
+    }
+
     private static int calculateRingBufferSize() {
         int ringBufferSize = RINGBUFFER_DEFAULT_SIZE;
-        final String userPreferredRBSize = PropertiesUtil.getProperties().getStringProperty("AsyncLogger.RingBufferSize",
-                String.valueOf(ringBufferSize));
+        final String userPreferredRBSize = PropertiesUtil.getProperties().getStringProperty(
+                "AsyncLogger.RingBufferSize", String.valueOf(ringBufferSize));
         try {
             int size = Integer.parseInt(userPreferredRBSize);
             if (size < RINGBUFFER_MIN_SIZE) {
@@ -151,20 +162,19 @@ public class AsyncLogger extends Logger {
     }
 
     /**
-     * Initialize an {@code Info} object that is threadlocal to the consumer/appender thread.
-     * This Info object uniquely has attribute {@code isAppenderThread} set to {@code true}.
-     * All other Info objects will have this attribute set to {@code false}.
-     * This allows us to detect Logger.log() calls initiated from the appender thread,
-     * which may cause deadlock when the RingBuffer is full. (LOG4J2-471)
+     * Initialize an {@code Info} object that is threadlocal to the consumer/appender thread. This Info object uniquely
+     * has attribute {@code isAppenderThread} set to {@code true}. All other Info objects will have this attribute set
+     * to {@code false}. This allows us to detect Logger.log() calls initiated from the appender thread, which may cause
+     * deadlock when the RingBuffer is full. (LOG4J2-471)
      */
     private static void initInfoForExecutorThread() {
-        executor.submit(new Runnable(){
+        EXECUTOR.submit(new Runnable() {
             @Override
             public void run() {
                 final boolean isAppenderThread = true;
                 final Info info = new Info(new RingBufferLogEventTranslator(), //
                         Thread.currentThread().getName(), isAppenderThread);
-                threadlocalInfo.set(info);
+                Info.THREADLOCAL.set(info);
             }
         });
     }
@@ -190,7 +200,9 @@ public class AsyncLogger extends Logger {
             return null;
         }
         try {
-            final ExceptionHandler<RingBufferLogEvent> result = Loader.newCheckedInstanceOf(cls, ExceptionHandler.class);
+            @SuppressWarnings("unchecked")
+            final ExceptionHandler<RingBufferLogEvent> result = Loader
+                    .newCheckedInstanceOf(cls, ExceptionHandler.class);
             LOGGER.debug("AsyncLogger.ExceptionHandler={}", result);
             return result;
         } catch (final Exception ignored) {
@@ -200,55 +212,104 @@ public class AsyncLogger extends Logger {
     }
 
     /**
-     * Constructs an {@code AsyncLogger} with the specified context, name and
-     * message factory.
-     *
-     * @param context context of this logger
-     * @param name name of this logger
-     * @param messageFactory message factory of this logger
-     */
-    public AsyncLogger(final LoggerContext context, final String name, final MessageFactory messageFactory) {
-        super(context, name, messageFactory);
-    }
-
-    /**
      * Tuple with the event translator and thread name for a thread.
      */
     static class Info {
+        private static final ThreadLocal<Info> THREADLOCAL = new ThreadLocal<Info>() {
+            @Override
+            protected Info initialValue() {
+                // by default, set isAppenderThread to false
+                return new Info(new RingBufferLogEventTranslator(), Thread.currentThread().getName(), false);
+            }
+        };
         private final RingBufferLogEventTranslator translator;
         private final String cachedThreadName;
         private final boolean isAppenderThread;
-        public Info(final RingBufferLogEventTranslator translator, final String threadName, final boolean appenderThread) {
+
+        public Info(final RingBufferLogEventTranslator translator, final String threadName,
+                final boolean appenderThread) {
             this.translator = translator;
             this.cachedThreadName = threadName;
             this.isAppenderThread = appenderThread;
         }
+
+        // LOG4J2-467
+        private String threadName() {
+            return THREAD_NAME_STRATEGY.getThreadName(this);
+        }
     }
 
     @Override
-    public void logMessage(final String fqcn, final Level level, final Marker marker, final Message message, final Throwable thrown) {
-        // TODO refactor to reduce size to <= 35 bytecodes to allow JVM to inline it
-        Info info = threadlocalInfo.get();
-        if (info == null) {
-            info = new Info(new RingBufferLogEventTranslator(), Thread.currentThread().getName(), false);
-            threadlocalInfo.set(info);
-        }
-        
+    public void logMessage(final String fqcn, final Level level, final Marker marker, final Message message,
+            final Throwable thrown) {
+
         final Disruptor<RingBufferLogEvent> temp = disruptor;
         if (temp == null) { // LOG4J2-639
             LOGGER.fatal("Ignoring log event after log4j was shut down");
-            return;
+        } else {
+            logMessage0(temp, fqcn, level, marker, message, thrown);
         }
+    }
 
-        // LOG4J2-471: prevent deadlock when RingBuffer is full and object
-        // being logged calls Logger.log() from its toString() method
-        if (info.isAppenderThread && temp.getRingBuffer().remainingCapacity() == 0) {
-            // bypass RingBuffer and invoke Appender directly
-            config.loggerConfig.log(getName(), fqcn, marker, level, message, thrown);
-            return;
+    private void logMessage0(final Disruptor<RingBufferLogEvent> theDisruptor, final String fqcn, final Level level,
+            final Marker marker, final Message message, final Throwable thrown) {
+        final Info info = Info.THREADLOCAL.get();
+        logMessageInAppropriateThread(info, theDisruptor, fqcn, level, marker, message, thrown);
+    }
+
+    private void logMessageInAppropriateThread(final Info info, final Disruptor<RingBufferLogEvent> theDisruptor,
+            final String fqcn, final Level level, final Marker marker, final Message message, final Throwable thrown) {
+        if (!logMessageInCurrentThread(info, theDisruptor, fqcn, level, marker, message, thrown)) {
+            logMessageInBackgroundThread(info, fqcn, level, marker, message, thrown);
         }
+    }
+
+    /**
+     * LOG4J2-471: prevent deadlock when RingBuffer is full and object being logged calls Logger.log() from its
+     * toString() method
+     *
+     * @param info threadlocal information - used to determine if the current thread is the background appender thread
+     * @param theDisruptor used to check if the buffer is full
+     * @param fqcn fully qualified caller name
+     * @param level log level
+     * @param marker optional marker
+     * @param message log message
+     * @param thrown optional exception
+     * @return {@code true} if the event has been logged in the current thread, {@code false} if it should be passed to
+     *         the background thread
+     */
+    private boolean logMessageInCurrentThread(Info info, final Disruptor<RingBufferLogEvent> theDisruptor,
+            final String fqcn, final Level level, final Marker marker, final Message message, final Throwable thrown) {
+        if (info.isAppenderThread && theDisruptor.getRingBuffer().remainingCapacity() == 0) {
+            // bypass RingBuffer and invoke Appender directly
+            final ReliabilityStrategy strategy = privateConfig.loggerConfig.getReliabilityStrategy();
+            strategy.log(this, getName(), fqcn, marker, level, message, thrown);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Enqueues the specified message to be logged in the background thread.
+     * 
+     * @param info holds some cached information
+     * @param fqcn fully qualified caller name
+     * @param level log level
+     * @param marker optional marker
+     * @param message log message
+     * @param thrown optional exception
+     */
+    private void logMessageInBackgroundThread(Info info, final String fqcn, final Level level, final Marker marker,
+            final Message message, final Throwable thrown) {
+
         message.getFormattedMessage(); // LOG4J2-763: ask message to freeze parameters
-        final boolean includeLocation = config.loggerConfig.isIncludeLocation();
+
+        initLogMessageInfo(info, fqcn, level, marker, message, thrown);
+        enqueueLogMessageInfo(info);
+    }
+
+    private void initLogMessageInfo(Info info, final String fqcn, final Level level, final Marker marker,
+            final Message message, final Throwable thrown) {
         info.translator.setValues(this, getName(), marker, fqcn, level, message, //
                 // don't construct ThrowableProxy until required
                 thrown, //
@@ -264,20 +325,39 @@ public class AsyncLogger extends Logger {
 
                 // Thread.currentThread().getName(), //
                 // info.cachedThreadName, //
-                THREAD_NAME_STRATEGY.getThreadName(info), // LOG4J2-467
+                info.threadName(), //
 
                 // location: very expensive operation. LOG4J2-153:
                 // Only include if "includeLocation=true" is specified,
                 // exclude if not specified or if "false" was specified.
-                includeLocation ? location(fqcn) : null,
+                calcLocationIfRequested(fqcn),
 
                 // System.currentTimeMillis());
                 // CoarseCachedClock: 20% faster than system clock, 16ms gaps
                 // CachedClock: 10% faster than system clock, smaller gaps
                 // LOG4J2-744 avoid calling clock altogether if message has the timestamp
-                message instanceof TimestampMessage ? ((TimestampMessage) message).getTimestamp() :
-                        clock.currentTimeMillis());
+                eventTimeMillis(message), //
+                nanoClock.nanoTime() //
+                );
+    }
 
+    private long eventTimeMillis(final Message message) {
+        return message instanceof TimestampMessage ? ((TimestampMessage) message).getTimestamp() : CLOCK
+                .currentTimeMillis();
+    }
+
+    /**
+     * Returns the caller location if requested, {@code null} otherwise.
+     * 
+     * @param fqcn fully qualified caller name.
+     * @return the caller location if requested, {@code null} otherwise.
+     */
+    private StackTraceElement calcLocationIfRequested(String fqcn) {
+        final boolean includeLocation = privateConfig.loggerConfig.isIncludeLocation();
+        return includeLocation ? location(fqcn) : null;
+    }
+
+    private void enqueueLogMessageInfo(Info info) {
         // LOG4J2-639: catch NPE if disruptor field was set to null after our check above
         try {
             // Note: do NOT use the temp variable above!
@@ -294,15 +374,15 @@ public class AsyncLogger extends Logger {
     }
 
     /**
-     * This method is called by the EventHandler that processes the
-     * RingBufferLogEvent in a separate thread.
+     * This method is called by the EventHandler that processes the RingBufferLogEvent in a separate thread.
      *
      * @param event the event to log
      */
     public void actualAsyncLog(final RingBufferLogEvent event) {
-        final Map<Property, Boolean> properties = config.loggerConfig.getProperties();
-        event.mergePropertiesIntoContextMap(properties, config.config.getStrSubstitutor());
-        config.logEvent(event);
+        final Map<Property, Boolean> properties = privateConfig.loggerConfig.getProperties();
+        event.mergePropertiesIntoContextMap(properties, privateConfig.config.getStrSubstitutor());
+        final ReliabilityStrategy strategy = privateConfig.loggerConfig.getReliabilityStrategy();
+        strategy.log(this, event);
     }
 
     public static void stop() {
@@ -325,25 +405,46 @@ public class AsyncLogger extends Logger {
             }
         }
         temp.shutdown(); // busy-spins until all events currently in the disruptor have been processed
-        executor.shutdown(); // finally, kill the processor thread
-        threadlocalInfo.remove(); // LOG4J2-323
+        EXECUTOR.shutdown(); // finally, kill the processor thread
+        Info.THREADLOCAL.remove(); // LOG4J2-323
     }
 
     /**
      * Returns {@code true} if the specified disruptor still has unprocessed events.
      */
-    private static boolean hasBacklog(final Disruptor<?> disruptor) {
-        final RingBuffer<?> ringBuffer = disruptor.getRingBuffer();
+    private static boolean hasBacklog(final Disruptor<?> theDisruptor) {
+        final RingBuffer<?> ringBuffer = theDisruptor.getRingBuffer();
         return !ringBuffer.hasAvailableCapacity(ringBuffer.getBufferSize());
     }
 
     /**
-     * Creates and returns a new {@code RingBufferAdmin} that instruments the
-     * ringbuffer of the {@code AsyncLogger}.
+     * Creates and returns a new {@code RingBufferAdmin} that instruments the ringbuffer of the {@code AsyncLogger}.
      *
      * @param contextName name of the global {@code AsyncLoggerContext}
+     * @return a new {@code RingBufferAdmin} that instruments the ringbuffer
      */
     public static RingBufferAdmin createRingBufferAdmin(final String contextName) {
         return RingBufferAdmin.forAsyncLogger(disruptor.getRingBuffer(), contextName);
+    }
+
+    /**
+     * Returns the {@code NanoClock} to use for creating the nanoTime timestamp of log events.
+     * 
+     * @return the {@code NanoClock} to use for creating the nanoTime timestamp of log events
+     */
+    public static NanoClock getNanoClock() {
+        return nanoClock;
+    }
+
+    /**
+     * Sets the {@code NanoClock} to use for creating the nanoTime timestamp of log events.
+     * <p>
+     * FOR INTERNAL USE. This method may be called with a different {@code NanoClock} implementation when the
+     * configuration changes.
+     * 
+     * @param nanoClock the {@code NanoClock} to use for creating the nanoTime timestamp of log events
+     */
+    public static void setNanoClock(NanoClock nanoClock) {
+        AsyncLogger.nanoClock = Objects.requireNonNull(nanoClock, "NanoClock must be non-null");
     }
 }

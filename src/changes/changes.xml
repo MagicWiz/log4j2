@@ -23,9 +23,117 @@
     <title>Changes</title>
   </properties>
   <body>
-    <release version="2.4" date="2015-MM-DD" description="GA Release 2.4">
-      <action issue="LOG4J2=1044" dev="rgoers" type="update">
-        Support batchSize in FlumeAvroManager.
+    <release version="2.4.1" date="2015-MM-DD" description="GA Release 2.4.1">
+      <action issue="LOG4J2-1135" dev="rpopma" type="fix">
+        Compression on rollover was broken: log file was renamed to .zip but not compressed.
+      </action>
+      <action issue="LOG4J2-1129" dev="rgoers" type="add">
+        Allow PatternLayout to select a pattern to use based on some selection criteria.
+      </action>
+      <action issue="LOG4J2-1127" dev="ggregory" type="fix">
+        log4j2.xml cannot be parsed on Oracle Weblogic 12c
+      </action>
+      <action issue="LOG4J2-1132" dev="ggregory" type="fix">
+        Do not use MongoDB driver 2.13.3 deprecated methods.
+      </action>
+      <action issue="LOG4J2-1040" dev="ggregory" type="update">
+        Update MongoDB driver from 2.13.3 to 3.0.4.
+      </action>
+      <action issue="LOG4J2-1128" dev="ggregory" type="update">
+        Reuse StringBuilder to improve performance for String-based layouts: CSV, GELF, HTML, RFC524, Syslog.
+      </action>
+      <action issue="LOG4J2-1131" dev="ggregory" type="update">
+        Update mongo-java-driver from 2.13.2 to 2.13.3.
+      </action>
+    </release>
+    <release version="2.4" date="2015-09-20" description="GA Release 2.4">
+      <action issue="LOG4J2-635" dev="rgoers" type="add">
+        Add support for configuration via Properties.
+      </action>
+      <action issue="LOG4J2-952" dev="rgoers" type="add">
+        Add ConfigurationBuilder for programmatic configuration.
+      </action>
+      <action issue="LOG4J2-1017" dev="ggregory" type="update">
+        Update Java platform from Java 6 to 7. From this version onwards, log4j 2 requires Java 7.
+      </action>
+      <action issue="LOG4J2-599" dev="rpopma" type="add">
+        Added support for Java 8 lambda expressions to lazily construct a log message only if
+              the requested log level is enabled.
+      </action>
+      <action issue="LOG4J2-1118" dev="rpopma" type="add">
+        Updated Logger wrapper generator tool to add Java 8 lambda support for custom log levels.
+      </action>
+      <action issue="LOG4J2-1107" dev="ggregory" type="add" due-to="Mikael Ståldal">
+        New Appender for Apache Kafka.
+      </action>
+      <action issue="LOG4J2-1113" dev="ggregory" type="add" due-to="Gary Gregory">
+        New publisher Appender for ZeroMQ (using JeroMQ).
+      </action>
+      <action issue="LOG4J2-1088" dev="ggregory" type="add" due-to="Gary Gregory">
+        Add Comma Separated Value (CSV) layouts for parameter and event logging.
+      </action>
+      <action issue="LOG4J2-812" dev="rgoers" type="update">
+        PatternLayout timestamp formatting performance improvement: replaced synchronized SimpleDateFormat with
+        Apache Commons FastDateFormat. This and better caching resulted in a ~3-30X faster timestamp formatting.
+      </action>
+      <action issue="LOG4J2-1097" dev="rpopma" type="update">
+        PatternLayout timestamp formatting performance improvement: predefined date formats (and variants using
+        a period '.' millisecond separator instead of ',') are now formatted ~2-10X faster than other date formats.
+      </action>
+      <action issue="LOG4J2-1096" dev="rpopma" type="update">
+        Improved performance of ParameterizedMessage::getFormattedMessage by ~2X.
+      </action>
+      <action issue="LOG4J2-1120" dev="rpopma" type="update">
+        LoggerConfig performance improvements: avoid unnecessary lock acquisition, use more efficient data structure.
+      </action>
+      <action issue="LOG4J2-1125" dev="rpopma" type="update">
+        PatternLayout performance improvement by caching and reusing a ThreadLocal StringBuilder.
+      </action>
+      <action issue="LOG4J2-1121" dev="rpopma" type="fix">
+        Fixed potential race condition on reconfiguration. Introduced ReliabilityStrategy to facilitate
+        switching between different mechanisms for preventing log events from being dropped on reconfiguration.
+      </action>
+      <action issue="LOG4J2-1114" dev="ggregory" type="update">
+        Add thread name to status logger layout.
+      </action>
+      <action issue="LOG4J2-1123" dev="ggregory" type="fix" due-to="Gary Gregory">
+        Core Configurator.initialize(String, ClassLoader, String) fails to work when config location is a file path.
+      </action>
+      <action issue="LOG4J2-1117" dev="ggregory" type="fix" due-to="Marcus Thiesen">
+        OutputStreamManager in ConsoleAppender leaking managers.
+      </action>
+      <action issue="LOG4J2-1044" dev="rgoers" type="fix">
+        Write pending events to Flume when the appender is stopped.
+      </action>
+      <action issue="LOG4J2-1108" dev="ggregory" type="fix" due-to="Mikael Ståldal">
+        NullPointerException when passing null to java.util.logging.Logger.setLevel().
+      </action>
+      <action issue="LOG4J2-1110" dev="ggregory" type="fix">
+        org.apache.logging.log4j.jul.CoreLogger.setLevel() checks for security permission too late.
+      </action>
+      <action dev="rpopma" type="remove">
+        Removed experimental interface LevelLogger which got committed to master by mistake.
+      </action>
+      <action issue="LOG4J2-1010" dev="rgoers" type="update">
+        Pass log event when interpolating logger properties.
+      </action>
+      <action issue="LOG4J2-1090" dev="ggregory" type="add">
+        Add Core Configurator APIs to change a logger's level.
+      </action>
+      <action issue="LOG4J2-1105" dev="ggregory" type="add" due-to="Gary Gregory">
+        Add API org.apache.logging.log4j.Level.isInRange(Level, Level).
+      </action>
+      <action issue="LOG4J2-1106" dev="ggregory" type="add" due-to="Gary Gregory">
+        Add a LevelRangeFilter class.
+      </action>
+      <action issue="LOG4J2-1076" dev="rpopma" type="add">
+        Added support for system nanosecond time in pattern layout.
+      </action>
+      <action issue="LOG4J2-1075" dev="rpopma" type="add">
+        Added support for compressing to bzip2 format on file rollover.
+      </action>
+      <action issue="LOG4J2-1077" dev="ggregory" type="add">
+        Support additional Apache Commons Compress compression formats on rollover: Deflate, Pack200, XY.
       </action>
       <action issue="LOG4J2-767" dev="ggregory" type="add" due-to="Mikael Ståldal">
         New module for Liquibase integration.
@@ -41,10 +149,13 @@
       </action>
       <action issue="LOG4J2-1057" dev="ggregory" type="add">
         Add API org.apache.logging.log4j.LogManager.getFormatterLogger().
-      </action>     
+      </action>
       <action issue="LOG4J2-1066" dev="ggregory" type="add" due-to="Charles Allen">
         Expose Log4jContextFactory's ShutdownCallbackRegistry.
-      </action>     
+      </action>
+      <action issue="LOG4J2-1084" dev="ggregory" type="fix" due-to="Philipp Schneider">
+        Misleading StatusLogger WARN event in LogManager with java.util.Map.
+      </action>
       <action issue="LOG4J2-1051" dev="ggregory" type="fix" due-to="Lukasz Lenart">
         NoClassDefFoundError when starting app on Google App Engine.
       </action>
@@ -64,7 +175,7 @@
         AsyncAppender now resets the thread interrupted flag after catching InterruptedException.
       </action>
       <action issue="LOG4J2-1048" dev="rpopma" type="fix" due-to="Nikhil">
-        FileConfigurationMonitor unnecessarily calls System.currentTimeMillis causing high CPU usage.
+        FileConfigurationMonitor unnecessarily calls System.currentTimeMillis() causing high CPU usage.
       </action>
       <action issue="LOG4J2-1037" dev="ggregory" type="fix" due-to="Marc Dergacz">
         Backward compatibility issue in log4j-1.2-api NDC pop() and peek().
@@ -98,25 +209,37 @@
       </action>
       <action issue="LOG4J2-982" dev="ggregory" type="fix" due-to="Mikhail Mazurskiy">
         Use System.nanoTime() to measure time intervals.
-      </action>      
+      </action>
       <action issue="LOG4J2-1045" dev="ggregory" type="fix" due-to="Günter Albrecht">
         Externalize log4j2.xml via URL resource.
-      </action>      
+      </action>
       <action issue="LOG4J2-1058" dev="ggregory" type="fix" due-to="Daniel Branzea">
         Log4jMarker#contains(String) does not respect org.slf4j.Marker contract.
-      </action>      
+      </action>
       <action issue="LOG4J2-1060" dev="ggregory" type="fix">
         Log4jMarker#contains(Marker) does not respect org.slf4j.Marker contract.
-      </action>      
+      </action>
       <action issue="LOG4J2-1061" dev="ggregory" type="fix">
         Log4jMarker#remove(Marker) does not respect org.slf4j.Marker contract.
-      </action>            
+      </action>
       <action issue="LOG4J2-1062" dev="ggregory" type="fix">
         Log4jMarker#add(Marker) does not respect org.slf4j.Marker contract.
-      </action>            
+      </action>
       <action issue="LOG4J2-1064" dev="ggregory" type="fix">
         org.apache.logging.slf4j.Log4jMarker does not implement org.slf4j.Marker.equals(Object) org.slf4j.Marker.hashCode().
-      </action>            
+      </action>
+      <action issue="LOG4J2-889" dev="rpopma" type="fix" due-to="Maciej Karaś, Kenneth Leider">
+        Header in layout should not be written on application startup if appending to an existing file. Fixes LOG4J2-1030.
+      </action>
+      <action issue="LOG4J2-918" dev="rpopma" type="fix">
+        Clarify documentation for combining async with sync loggers.
+      </action>
+      <action issue="LOG4J2-1078" dev="ggregory" type="fix" due-to="Mikael Ståldal">
+        GelfLayout throws exception if some log event fields are null.
+      </action>
+      <action issue="LOG4J2-1044" dev="rgoers" type="update">
+        Support batchSize in FlumeAvroManager.
+      </action>
       <action issue="LOG4J2-1065" dev="ggregory" type="update">
         Define org.apache.logging.log4j.Marker.equals(Object) and org.apache.logging.log4j.Marker.hashCode().
       </action>
@@ -138,9 +261,6 @@
       <action issue="LOG4J2-959" dev="ggregory" type="update">
         Fix FindBugs DM_DEFAULT_ENCODING bug in SimpleLogger.logMessage() and simplify code.
       </action>
-      <action issue="LOG4J2-1017" dev="ggregory" type="update">
-        Update Java platform from Java 6 to 7.
-      </action>
       <action issue="LOG4J2-1036" dev="ggregory" type="update">
         Update Apache Flume from 1.5.2 to 1.6.0.
       </action>
@@ -152,6 +272,18 @@
       </action>
       <action issue="LOG4J2-1070" dev="ggregory" type="update">
         Update Java Mail from 1.5.2 to 1.5.4.
+      </action>
+      <action issue="LOG4J2-1079" dev="ggregory" type="update">
+        Update Jackson from 2.5.3 to 2.5.4.
+      </action>
+      <action issue="LOG4J2-1879" dev="ggregory" type="update">
+        Update Jackson from 2.5.4 to 2.6.0.
+      </action>
+      <action issue="LOG4J2-1092" dev="ggregory" type="update">
+        Update Jackson from 2.6.0 to 2.6.1.
+      </action>
+      <action issue="LOG4J2-1104" dev="ggregory" type="update">
+        Update Apache Commons Compress from 1.9 to 1.10.
       </action>
     </release>
     <release version="2.3" date="2015-05-09" description="GA Release 2.3">

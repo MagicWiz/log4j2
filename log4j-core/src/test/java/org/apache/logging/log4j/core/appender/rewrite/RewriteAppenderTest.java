@@ -16,6 +16,11 @@
  */
 package org.apache.logging.log4j.core.appender.rewrite;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
 import java.util.List;
 import java.util.Map;
 
@@ -23,17 +28,15 @@ import org.apache.logging.log4j.EventLogger;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.LogEvent;
-import org.apache.logging.log4j.junit.InitialLoggerContext;
+import org.apache.logging.log4j.junit.LoggerContextRule;
 import org.apache.logging.log4j.message.MapMessage;
 import org.apache.logging.log4j.message.Message;
 import org.apache.logging.log4j.message.StructuredDataMessage;
 import org.apache.logging.log4j.test.appender.ListAppender;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
+import org.junit.ClassRule;
 import org.junit.Test;
-
-import static org.junit.Assert.*;
 
 /**
  *
@@ -42,13 +45,13 @@ public class RewriteAppenderTest {
     private ListAppender app;
     private ListAppender app2;
 
-    @Rule
-    public InitialLoggerContext init = new InitialLoggerContext("log4j-rewrite.xml");
+    @ClassRule
+    public static LoggerContextRule init = new LoggerContextRule("log4j-rewrite.xml");
 
     @Before
     public void setUp() throws Exception {
-        app = this.init.getListAppender("List");
-        app2 = this.init.getListAppender("List2");
+        app = init.getListAppender("List");
+        app2 = init.getListAppender("List2");
     }
 
     @After

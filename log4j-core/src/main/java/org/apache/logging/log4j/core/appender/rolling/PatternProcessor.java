@@ -34,7 +34,7 @@ import org.apache.logging.log4j.core.pattern.PatternParser;
 import org.apache.logging.log4j.status.StatusLogger;
 
 /**
- * Parse the rollover pattern.
+ * Parses the rollover pattern.
  */
 public class PatternProcessor {
 
@@ -82,12 +82,12 @@ public class PatternProcessor {
 
     /**
      * Returns the next potential rollover time.
-     * @param current The current time.
+     * @param currentMillis The current time.
      * @param increment The increment to the next time.
      * @param modulus If true the time will be rounded to occur on a boundary aligned with the increment.
      * @return the next potential rollover time and the timestamp for the target file.
      */
-    public long getNextTime(final long current, final int increment, final boolean modulus) {
+    public long getNextTime(final long currentMillis, final int increment, final boolean modulus) {
         prevFileTime = nextFileTime;
         long nextTime;
 
@@ -95,7 +95,7 @@ public class PatternProcessor {
             throw new IllegalStateException("Pattern does not contain a date");
         }
         final Calendar currentCal = Calendar.getInstance();
-        currentCal.setTimeInMillis(current);
+        currentCal.setTimeInMillis(currentMillis);
         final Calendar cal = Calendar.getInstance();
         cal.set(currentCal.get(Calendar.YEAR), 0, 1, 0, 0, 0);
         cal.set(Calendar.MILLISECOND, 0);
@@ -195,7 +195,7 @@ public class PatternProcessor {
     }
 
     /**
-     * Format file name.
+     * Formats file name.
      * @param subst The StrSubstitutor.
      * @param buf string buffer to which formatted file name is appended, may not be null.
      * @param obj object to be evaluated in formatting, may not be null.
@@ -205,14 +205,14 @@ public class PatternProcessor {
         // for creating the file name of rolled-over files. 
         final long time = prevFileTime == 0 ? System.currentTimeMillis() : prevFileTime;
         formatFileName(buf, new Date(time), obj);
-        final LogEvent event = new Log4jLogEvent(time);
+        final LogEvent event = new Log4jLogEvent.Builder().setTimeMillis(time).build();
         final String fileName = subst.replace(event, buf);
         buf.setLength(0);
         buf.append(fileName);
     }
 
     /**
-     * Format file name.
+     * Formats file name.
      * @param buf string buffer to which formatted file name is appended, may not be null.
      * @param objects objects to be evaluated in formatting, may not be null.
      */

@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.apache.logging.log4j</groupId>
     <artifactId>log4j</artifactId>
-    <version>2.4-SNAPSHOT</version>
+    <version>2.4.1-SNAPSHOT</version>
     <relativePath>../</relativePath>
   </parent>
   <groupId>org.apache.logging.log4j.samples</groupId>
@@ -81,6 +81,8 @@
     <module>flume-common</module>
     <module>flume-remote</module>
     <module>flume-embedded</module>
+    <module>configuration</module>
+    <module>loggerProperties</module>
   </modules>
   <build>
     <plugins>

@@ -88,7 +88,7 @@ public class FlumeAvroManager extends AbstractFlumeManager {
      * @param requestTimeoutMillis The request timeout in ms.
      * @return A FlumeAvroManager.
      */
-    public static FlumeAvroManager getManager(final String name, final Agent[] agents, int batchSize, int delayMillis,
+    public static FlumeAvroManager getManager(final String name, final Agent[] agents, int batchSize, final int delayMillis,
                                               final int retries, final int connectTimeoutMillis, final int requestTimeoutMillis) {
         if (agents == null || agents.length == 0) {
             throw new IllegalArgumentException("At least one agent is required");
@@ -199,11 +199,11 @@ public class FlumeAvroManager extends AbstractFlumeManager {
             }
         } else {
             batchEvent.addEvent(event);
-            int count = batchEvent.getEvents().size();
-            if (count == 1) {
+            final int eventCount = batchEvent.getEvents().size();
+            if (eventCount == 1) {
                 nextSend = System.nanoTime() + delayNanos;
             }
-            if (count >= batchSize || System.nanoTime() >= nextSend) {
+            if (eventCount >= batchSize || System.nanoTime() >= nextSend) {
                 send(batchEvent);
                 batchEvent = new BatchEvent();
             }
@@ -221,13 +221,13 @@ public class FlumeAvroManager extends AbstractFlumeManager {
 
             props.put("client.type", "default_failover");
 
-            int count = 1;
+            int agentCount = 1;
             final StringBuilder sb = new StringBuilder();
             for (final Agent agent : agents) {
                 if (sb.length() > 0) {
                     sb.append(' ');
                 }
-                final String hostName = "host" + count++;
+                final String hostName = "host" + agentCount++;
                 props.put("hosts." + hostName, agent.getHost() + ':' + agent.getPort());
                 sb.append(hostName);
             }
@@ -258,6 +258,15 @@ public class FlumeAvroManager extends AbstractFlumeManager {
     protected void releaseSub() {
         if (rpcClient != null) {
             try {
+                synchronized(this) {
+                    try {
+                        if (batchSize > 1 && batchEvent.getEvents().size() > 0) {
+                            send(batchEvent);
+                        }
+                    } catch (final Exception ex) {
+                        LOGGER.error("Error sending final batch: {}", ex.getMessage());
+                    }
+                }
                 rpcClient.close();
             } catch (final Exception ex) {
                 LOGGER.error("Attempt to close RPC client failed", ex);

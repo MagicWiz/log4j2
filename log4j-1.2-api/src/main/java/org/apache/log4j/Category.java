@@ -67,7 +67,7 @@ public class Category {
      * @param name The name of the Logger.
      */
     protected Category(final String name) {
-        this((LoggerContext) PrivateManager.getContext(), name);
+        this(PrivateManager.getContext(), name);
     }
 
     private Category(final org.apache.logging.log4j.core.Logger logger) {
@@ -75,14 +75,14 @@ public class Category {
     }
 
     public static Category getInstance(final String name) {
-        return getInstance((LoggerContext) PrivateManager.getContext(), name, loggerFactory);
+        return getInstance(PrivateManager.getContext(), name, loggerFactory);
     }
 
-    static Category getInstance(final LoggerContext context, final String name) {
+    static Logger getInstance(final LoggerContext context, final String name) {
         return getInstance(context, name, loggerFactory);
     }
 
-    static Category getInstance(final LoggerContext context, final String name, final LoggerFactory factory) {
+    static Logger getInstance(final LoggerContext context, final String name, final LoggerFactory factory) {
         final ConcurrentMap<String, Logger> loggers = getLoggersMap(context);
         Logger logger = loggers.get(name);
         if (logger != null) {
@@ -97,7 +97,7 @@ public class Category {
         return getInstance(clazz.getName());
     }
 
-    static Category getInstance(final LoggerContext context, @SuppressWarnings("rawtypes") final Class clazz) {
+    static Logger getInstance(final LoggerContext context, @SuppressWarnings("rawtypes") final Class clazz) {
         return getInstance(context, clazz.getName());
     }
 
@@ -123,8 +123,7 @@ public class Category {
         return getInstance(Strings.EMPTY);
     }
 
-
-    static Category getRoot(final LoggerContext context) {
+    static Logger getRoot(final LoggerContext context) {
         return getInstance(context, Strings.EMPTY);
     }
 
@@ -369,8 +368,9 @@ public class Category {
         String name = logger.getName();
         final ConcurrentMap<String, Logger> loggers = getLoggersMap(logger.getContext());
         while ((name = NameUtil.getSubName(name)) != null) {
-            if (loggers.containsKey(name)) {
-                final ResourceBundle rb = loggers.get(name).bundle;
+            final Logger subLogger = loggers.get(name);
+            if (subLogger != null) {
+				final ResourceBundle rb = subLogger.bundle;
                 if (rb != null) {
                     return rb;
                 }
@@ -458,8 +458,8 @@ public class Category {
     private static class PrivateManager extends org.apache.logging.log4j.LogManager {
         private static final String FQCN = Category.class.getName();
 
-        public static org.apache.logging.log4j.spi.LoggerContext getContext() {
-            return getContext(FQCN, false);
+        public static LoggerContext getContext() {
+            return (LoggerContext) getContext(FQCN, false);
         }
 
         public static org.apache.logging.log4j.Logger getLogger(final String name) {

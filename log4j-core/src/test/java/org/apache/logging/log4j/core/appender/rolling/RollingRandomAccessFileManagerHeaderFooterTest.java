@@ -16,6 +16,10 @@
  */
 package org.apache.logging.log4j.core.appender.rolling;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.nio.charset.Charset;
@@ -23,13 +27,11 @@ import java.nio.charset.Charset;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.layout.HtmlLayout;
 import org.apache.logging.log4j.core.util.Closer;
-import org.apache.logging.log4j.junit.InitialLoggerContext;
+import org.apache.logging.log4j.junit.LoggerContextRule;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
+import org.junit.ClassRule;
 import org.junit.Test;
-
-import static org.junit.Assert.*;
 
 /**
  *
@@ -39,8 +41,8 @@ public class RollingRandomAccessFileManagerHeaderFooterTest {
     private static final String DIR = "target/RollingRandomAccessFileAppenderHeaderFooterTest/";
     private static final String LOGFILE = "target/RollingRandomAccessFileAppenderHeaderFooterTest.log";
 
-    @Rule
-    public InitialLoggerContext init = new InitialLoggerContext("RollingRandomAccessFileAppenderHeaderFooterTest.xml");
+    @ClassRule
+    public static LoggerContextRule init = new LoggerContextRule("RollingRandomAccessFileAppenderHeaderFooterTest.xml");
 
     private Logger logger;
 

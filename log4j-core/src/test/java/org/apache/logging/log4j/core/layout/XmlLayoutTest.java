@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Marker;
 import org.apache.logging.log4j.MarkerManager;
 import org.apache.logging.log4j.ThreadContext;
@@ -33,7 +32,6 @@ import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.ConfigurationFactory;
 import org.apache.logging.log4j.core.impl.Log4jLogEvent;
 import org.apache.logging.log4j.core.jackson.Log4jXmlObjectMapper;
-import org.apache.logging.log4j.core.util.Throwables;
 import org.apache.logging.log4j.message.SimpleMessage;
 import org.apache.logging.log4j.spi.AbstractLogger;
 import org.apache.logging.log4j.test.appender.ListAppender;
@@ -65,11 +63,11 @@ public class XmlLayoutTest {
     public static void setupClass() {
         ThreadContext.clearAll();
         ConfigurationFactory.setConfigurationFactory(cf);
-        final LoggerContext ctx = (LoggerContext) LogManager.getContext();
+        final LoggerContext ctx = LoggerContext.getContext();
         ctx.reconfigure();
     }
 
-    LoggerContext ctx = (LoggerContext) LogManager.getContext();
+    LoggerContext ctx = LoggerContext.getContext();
 
     Logger rootLogger = this.ctx.getLogger("");
 
@@ -254,8 +252,13 @@ public class XmlLayoutTest {
     @Test
     public void testLayoutLoggerName() {
         final XmlLayout layout = XmlLayout.createLayout(false, true, true, false, null);
-        final Log4jLogEvent event = Log4jLogEvent.createEvent("a.B", null, "f.q.c.n", Level.DEBUG, 
-                new SimpleMessage("M"), null, null, null, null, "threadName", null, 1);
+        final Log4jLogEvent event = Log4jLogEvent.newBuilder() //
+                .setLoggerName("a.B") //
+                .setLoggerFqcn("f.q.c.n") //
+                .setLevel(Level.DEBUG) //
+                .setMessage(new SimpleMessage("M")) //
+                .setThreadName("threadName") //
+                .setTimeMillis(1).build();
         final String str = layout.toSerializable(event);
         assertTrue(str, str.contains("loggerName=\"a.B\""));
     }

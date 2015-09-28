@@ -16,9 +16,14 @@
  */
 package org.apache.logging.log4j.core.util;
 
+import java.io.File;
 import java.net.InetAddress;
+import java.net.MalformedURLException;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.Enumeration;
 
@@ -26,19 +31,20 @@ import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.status.StatusLogger;
 
 /**
- *
+ * Networking-related convenience methods.
  */
 public final class NetUtils {
 
     private static final Logger LOGGER = StatusLogger.getLogger();
+    private static final String UNKNOWN_LOCALHOST = "UNKNOWN_LOCALHOST";
 
     private NetUtils() {
+        // empty
     }
 
     /**
-     * This method gets the network name of the machine we are running on.
-     * Returns "UNKNOWN_LOCALHOST" in the unlikely case where the host name
-     * cannot be found.
+     * This method gets the network name of the machine we are running on. Returns "UNKNOWN_LOCALHOST" in the unlikely
+     * case where the host name cannot be found.
      *
      * @return String the name of the local host
      */
@@ -64,10 +70,32 @@ public final class NetUtils {
                 }
             } catch (final SocketException se) {
                 LOGGER.error("Could not determine local host name", uhe);
-                return "UNKNOWN_LOCALHOST";
+                return UNKNOWN_LOCALHOST;
             }
             LOGGER.error("Could not determine local host name", uhe);
-            return "UNKNOWN_LOCALHOST";
+            return UNKNOWN_LOCALHOST;
+        }
+    }
+
+    /**
+     * Converts a URI string or file path to a URI object.
+     * 
+     * @param path the URI string or path
+     * @return the URI object
+     */
+    public static URI toURI(final String path) {
+        try {
+            // Resolves absolute URI
+            return new URI(path);
+        } catch (final URISyntaxException e) {
+            // A file path or a Apache Commons VFS URL might contain blanks.
+            // A file path may start with a driver letter
+            try {
+                final URL url = new URL(path);
+                return new URI(url.getProtocol(), url.getHost(), url.getPath(), null);
+            } catch (MalformedURLException | URISyntaxException nestedEx) {
+                return new File(path).toURI();
+            }
         }
     }
 

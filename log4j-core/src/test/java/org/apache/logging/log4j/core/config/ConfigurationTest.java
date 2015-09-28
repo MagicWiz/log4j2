@@ -32,7 +32,7 @@ import org.apache.logging.log4j.core.Filter;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.filter.ThreadContextMapFilter;
 import org.apache.logging.log4j.junit.CleanFiles;
-import org.apache.logging.log4j.junit.InitialLoggerContext;
+import org.apache.logging.log4j.junit.LoggerContextRule;
 import org.apache.logging.log4j.util.Strings;
 import org.junit.Before;
 import org.junit.Rule;
@@ -63,7 +63,7 @@ public class ConfigurationTest {
     @Rule
     public TestRule rules;
 
-    private final InitialLoggerContext init;
+    private final LoggerContextRule init;
 
     private LoggerContext ctx;
 
@@ -71,7 +71,7 @@ public class ConfigurationTest {
 
     public ConfigurationTest(final String configFileName, final String logFileName) {
         this.logFileName = logFileName;
-        this.init = new InitialLoggerContext(configFileName);
+        this.init = new LoggerContextRule(configFileName);
         rules = RuleChain.outerRule(new CleanFiles(logFileName)).around(this.init);
     }
 
@@ -99,6 +99,18 @@ public class ConfigurationTest {
         assertThat(appenders.size(), is(equalTo(3)));
     }
 
+    @Test
+    public void testGetLoggerConfigEmpty() throws Exception {
+        final Configuration config = this.ctx.getConfiguration();
+        assertEquals(config.getRootLogger(), config.getLoggerConfig(Strings.EMPTY));
+    }
+    
+    @Test(expected = NullPointerException.class)
+    public void testGetLoggerConfigNull() throws Exception {
+        final Configuration config = this.ctx.getConfiguration();
+        assertEquals(config.getRootLogger(), config.getLoggerConfig(null));
+    }
+    
     @Test
     public void testLogger() throws Exception {
         final Logger logger = this.ctx.getLogger(LOGGER_NAME);

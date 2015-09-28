@@ -35,12 +35,14 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.config.builder.api.ConfigurationBuilderFactory;
 import org.apache.logging.log4j.core.config.plugins.util.PluginManager;
 import org.apache.logging.log4j.core.config.plugins.util.PluginType;
 import org.apache.logging.log4j.core.lookup.Interpolator;
 import org.apache.logging.log4j.core.lookup.StrSubstitutor;
 import org.apache.logging.log4j.core.util.FileUtils;
 import org.apache.logging.log4j.core.util.Loader;
+import org.apache.logging.log4j.core.util.NetUtils;
 import org.apache.logging.log4j.core.util.ReflectionUtil;
 import org.apache.logging.log4j.status.StatusLogger;
 import org.apache.logging.log4j.util.LoaderUtil;
@@ -66,11 +68,11 @@ import org.apache.logging.log4j.util.Strings;
  * </ol>
  *
  * If the ConfigurationFactory that was added returns null on a call to
- * getConfiguration the any other ConfigurationFactories found as plugins will
+ * getConfiguration then any other ConfigurationFactories found as plugins will
  * be called in their respective order. DefaultConfiguration is always called
  * last if no configuration has been returned.
  */
-public abstract class ConfigurationFactory {
+public abstract class ConfigurationFactory extends ConfigurationBuilderFactory {
     /**
      * Allow the ConfigurationFactory class to be specified as a system property.
      */
@@ -393,7 +395,7 @@ public abstract class ConfigurationFactory {
                 if (configLocationStr != null) {
                     ConfigurationSource source = null;
                     try {
-                        source = getInputFromUri(FileUtils.getCorrectedFilePathUri(configLocationStr));
+                        source = getInputFromUri(NetUtils.toURI(configLocationStr));
                     } catch (final Exception ex) {
                         // Ignore the error and try as a String.
                         LOGGER.catching(Level.DEBUG, ex);

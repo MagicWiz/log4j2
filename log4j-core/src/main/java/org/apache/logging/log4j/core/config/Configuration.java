@@ -58,7 +58,7 @@ public interface Configuration extends Filterable {
      * @param name The name of the Appender.
      * @return the Appender with the specified name or null if the Appender cannot be located.
      */
-    Appender getAppender(String name);
+    <T extends Appender> T getAppender(String name);
 
     /**
      * Returns a Map containing all the Appenders and their name.
@@ -90,6 +90,12 @@ public interface Configuration extends Filterable {
     List<String> getPluginPackages();
 
     Map<String, String> getProperties();
+
+    /**
+     * Returns the root Logger.
+     * @return the root Logger.
+     */
+    LoggerConfig getRootLogger();
 
     void addListener(ConfigurationListener listener);
 
@@ -137,4 +143,5 @@ public interface Configuration extends Filterable {
      * @return the custom levels defined in the current configuration
      */
     List<CustomLevelConfig> getCustomLevels();
+
 }

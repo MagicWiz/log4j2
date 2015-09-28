@@ -19,7 +19,7 @@ package org.apache.logging.log4j.core;
 import java.util.Calendar;
 
 import org.apache.logging.log4j.core.appender.FileAppender;
-import org.apache.logging.log4j.junit.InitialLoggerContext;
+import org.apache.logging.log4j.junit.LoggerContextRule;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -35,13 +35,12 @@ public class LoggerDateTest {
     private FileAppender fileApp;
 
     @ClassRule
-    public static InitialLoggerContext context = new InitialLoggerContext(CONFIG);
+    public static LoggerContextRule context = new LoggerContextRule(CONFIG);
 
     @Before
     public void before() {
         fileApp = (FileAppender) context.getRequiredAppender("File");
     }
-
 
     @Test
     public void testFileName() {

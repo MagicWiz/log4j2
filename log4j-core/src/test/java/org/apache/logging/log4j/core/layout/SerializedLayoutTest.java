@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.LoggingException;
 import org.apache.logging.log4j.ThreadContext;
 import org.apache.logging.log4j.core.Appender;
@@ -49,7 +48,7 @@ import static org.junit.Assert.*;
  */
 public class SerializedLayoutTest {
     private static final String DAT_PATH = "target/test-classes/serializedEvent.dat";
-    LoggerContext ctx = (LoggerContext) LogManager.getContext();
+    LoggerContext ctx = LoggerContext.getContext();
     Logger root = ctx.getLogger("");
 
     static ConfigurationFactory cf = new BasicConfigurationFactory();
@@ -58,7 +57,7 @@ public class SerializedLayoutTest {
     public static void setupClass() {
         ThreadContext.clearAll();
         ConfigurationFactory.setConfigurationFactory(cf);
-        final LoggerContext ctx = (LoggerContext) LogManager.getContext();
+        final LoggerContext ctx = LoggerContext.getContext();
         ctx.reconfigure();
     }
 
@@ -145,8 +144,13 @@ public class SerializedLayoutTest {
     public void testSerialization() throws Exception {
         final SerializedLayout layout = SerializedLayout.createLayout();
         final Throwable throwable = new LoggingException("Test");
-        final LogEvent event = new Log4jLogEvent(this.getClass().getName(), null,
-            "org.apache.logging.log4j.core.Logger", Level.INFO, new SimpleMessage("Hello, world!"), throwable);
+        final LogEvent event = Log4jLogEvent.newBuilder() //
+                .setLoggerName(this.getClass().getName()) //
+                .setLoggerFqcn("org.apache.logging.log4j.core.Logger") //
+                .setLevel(Level.INFO) //
+                .setMessage(new SimpleMessage("Hello, world!")) //
+                .setThrown(throwable) //
+                .build();
         final byte[] result = layout.toByteArray(event);
         assertNotNull(result);
         final FileOutputStream fos = new FileOutputStream(DAT_PATH);
@@ -160,8 +164,9 @@ public class SerializedLayoutTest {
         testSerialization();
         final File file = new File(DAT_PATH);
         final FileInputStream fis = new FileInputStream(file);
-        final ObjectInputStream ois = new ObjectInputStream(fis);
-        final LogEvent event = (LogEvent) ois.readObject();
-        assertNotNull(event);
+        try (final ObjectInputStream ois = new ObjectInputStream(fis) ) {
+            final LogEvent event = (LogEvent) ois.readObject();
+            assertNotNull(event);
+        }
     }
 }

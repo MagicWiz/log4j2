@@ -16,10 +16,17 @@
  */
 package org.apache.logging.log4j.core;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.logging.log4j.Level;
@@ -27,18 +34,17 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.MarkerManager;
 import org.apache.logging.log4j.ThreadContext;
 import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.logging.log4j.core.config.LoggerConfig;
-import org.apache.logging.log4j.junit.InitialLoggerContext;
+import org.apache.logging.log4j.junit.LoggerContextRule;
 import org.apache.logging.log4j.message.MessageFactory;
 import org.apache.logging.log4j.message.ParameterizedMessageFactory;
 import org.apache.logging.log4j.message.StringFormatterMessageFactory;
 import org.apache.logging.log4j.message.StructuredDataMessage;
 import org.apache.logging.log4j.test.appender.ListAppender;
 import org.junit.Before;
-import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
-
-import static org.junit.Assert.*;
 
 /**
  *
@@ -50,25 +56,34 @@ public class LoggerTest {
     private ListAppender host;
     private ListAppender noThrown;
 
-    @ClassRule
-    public static InitialLoggerContext context = new InitialLoggerContext(CONFIG);
+    @Rule
+    public LoggerContextRule context = new LoggerContextRule(CONFIG);
 
+    private void assertEventCount(final List<LogEvent> events, final int expected) {
+        assertEquals("Incorrect number of events.", expected, events.size());
+    }
+    
     @Before
     public void before() {
+        logger = context.getLogger("LoggerTest");
+        loggerChild = context.getLogger("LoggerTest.child");
+        loggerGrandchild = context.getLogger("LoggerTest.child.grand");
+        //
         app = context.getListAppender("List").clear();
         host = context.getListAppender("HostTest").clear();
         noThrown = context.getListAppender("NoThrowable").clear();
     }
 
-
-    org.apache.logging.log4j.Logger logger = context.getLogger("LoggerTest");
+    org.apache.logging.log4j.Logger logger;
+    org.apache.logging.log4j.Logger loggerChild;
+    org.apache.logging.log4j.Logger loggerGrandchild;
 
     @Test
     public void basicFlow() {
         logger.entry();
         logger.exit();
         final List<LogEvent> events = app.getEvents();
-        assertEquals("Incorrect number of events. Expected 2, actual " + events.size(), 2, events.size());
+        assertEventCount(events, 2);
     }
 
     @Test
@@ -76,14 +91,14 @@ public class LoggerTest {
         logger.entry(CONFIG);
         logger.exit(0);
         final List<LogEvent> events = app.getEvents();
-        assertEquals("Incorrect number of events. Expected 2, actual " + events.size(), 2, events.size());
+        assertEventCount(events, 2);
     }
 
     @Test
     public void throwing() {
         logger.throwing(new IllegalArgumentException("Test Exception"));
         final List<LogEvent> events = app.getEvents();
-        assertEquals("Incorrect number of events. Expected 1, actual " + events.size(), 1, events.size());
+        assertEventCount(events, 1);
     }
 
     @Test
@@ -94,14 +109,141 @@ public class LoggerTest {
             logger.catching(e);
         }
         final List<LogEvent> events = app.getEvents();
-        assertEquals("Incorrect number of events. Expected 1, actual " + events.size(), 1, events.size());
+        assertEventCount(events, 1);
     }
 
     @Test
     public void debug() {
         logger.debug("Debug message");
         final List<LogEvent> events = app.getEvents();
-        assertEquals("Incorrect number of events. Expected 1, actual " + events.size(), 1, events.size());
+        assertEventCount(events, 1);
+    }
+
+    @Test
+    public void debugChangeLevel() {
+        logger.debug("Debug message 1");
+        final List<LogEvent> events = app.getEvents();
+        assertEventCount(events, 1);
+        Configurator.setLevel(logger.getName(), Level.OFF);
+        logger.debug("Debug message 2");
+        assertEventCount(events, 1);
+        Configurator.setLevel(logger.getName(), Level.DEBUG);
+        logger.debug("Debug message 3");
+        assertEventCount(events, 2);
+    }
+
+    @Test
+    public void debugChangeLevelAllChildrenLoggers() {
+        // Use logger AND child loggers
+        logger.debug("Debug message 1");
+        loggerChild.debug("Debug message 1 child");
+        loggerGrandchild.debug("Debug message 1 grandchild");
+        final List<LogEvent> events = app.getEvents();
+        assertEventCount(events, 3);
+        Configurator.setAllLevels(logger.getName(), Level.OFF);
+        logger.debug("Debug message 2");
+        loggerChild.warn("Warn message 2 child");
+        loggerGrandchild.fatal("Fatal message 2 grandchild");
+        assertEventCount(events, 3);
+        Configurator.setAllLevels(logger.getName(), Level.DEBUG);
+        logger.debug("Debug message 3");
+        loggerChild.warn("Trace message 3 child");
+        loggerGrandchild.trace("Fatal message 3 grandchild");
+        assertEventCount(events, 5);
+    }
+
+    @Test
+    public void debugChangeLevelChildLogger() {
+        // Use logger AND child loggers
+        logger.debug("Debug message 1");
+        loggerChild.debug("Debug message 1 child");
+        loggerGrandchild.debug("Debug message 1 grandchild");
+        final List<LogEvent> events = app.getEvents();
+        assertEventCount(events, 3);
+        Configurator.setLevel(logger.getName(), Level.OFF);
+        logger.debug("Debug message 2");
+        loggerChild.debug("Debug message 2 child");
+        loggerGrandchild.debug("Debug message 2 grandchild");
+        assertEventCount(events, 3);
+        Configurator.setLevel(logger.getName(), Level.DEBUG);
+        logger.debug("Debug message 3");
+        loggerChild.debug("Debug message 3 child");
+        loggerGrandchild.debug("Debug message 3 grandchild");
+        assertEventCount(events, 6);
+    }
+
+    @Test
+    public void debugChangeLevelsChildLoggers() {
+        org.apache.logging.log4j.Logger loggerChild = context.getLogger(logger.getName() + ".child");
+        // Use logger AND loggerChild
+        logger.debug("Debug message 1");
+        loggerChild.debug("Debug message 1 child");
+        final List<LogEvent> events = app.getEvents();
+        assertEventCount(events, 2);
+        Configurator.setLevel(logger.getName(), Level.ERROR);
+        Configurator.setLevel(loggerChild.getName(), Level.DEBUG);
+        logger.debug("Debug message 2");
+        loggerChild.debug("Debug message 2 child");
+        assertEventCount(events, 3);
+        Configurator.setLevel(logger.getName(), Level.DEBUG);
+        logger.debug("Debug message 3");
+        loggerChild.debug("Debug message 3 child");
+        assertEventCount(events, 5);
+    }
+
+    @Test
+    public void debugChangeLevelsMap() {
+        logger.debug("Debug message 1");
+        final List<LogEvent> events = app.getEvents();
+        assertEventCount(events, 1);
+        Map<String, Level> map = new HashMap<>();
+        map.put(logger.getName(), Level.OFF);
+        Configurator.setLevel(map);
+        logger.debug("Debug message 2");
+        assertEventCount(events, 1);
+        map.put(logger.getName(), Level.DEBUG);
+        Configurator.setLevel(map);
+        logger.debug("Debug message 3");
+        assertEventCount(events, 2);
+    }
+
+    @Test
+    public void debugChangeLevelsMapChildLoggers() {
+        logger.debug("Debug message 1");
+        loggerChild.debug("Debug message 1 C");
+        loggerGrandchild.debug("Debug message 1 GC");
+        final List<LogEvent> events = app.getEvents();
+        assertEventCount(events, 3);
+        Map<String, Level> map = new HashMap<>();
+        map.put(logger.getName(), Level.OFF);
+        map.put(loggerChild.getName(), Level.DEBUG);
+        map.put(loggerGrandchild.getName(), Level.WARN);
+        Configurator.setLevel(map);
+        logger.debug("Debug message 2");
+        loggerChild.debug("Debug message 2 C");
+        loggerGrandchild.debug("Debug message 2 GC");
+        assertEventCount(events, 4);
+        map.put(logger.getName(), Level.DEBUG);
+        map.put(loggerChild.getName(), Level.OFF);
+        map.put(loggerGrandchild.getName(), Level.DEBUG);
+        Configurator.setLevel(map);
+        logger.debug("Debug message 3");
+        loggerChild.debug("Debug message 3 C");
+        loggerGrandchild.debug("Debug message 3 GC");
+        assertEventCount(events, 6);
+    }
+
+    @Test
+    public void debugChangeRootLevel() {
+        logger.debug("Debug message 1");
+        final List<LogEvent> events = app.getEvents();
+        assertEventCount(events, 1);
+        Configurator.setRootLevel(Level.OFF);
+        logger.debug("Debug message 2");
+        assertEventCount(events, 1);
+        Configurator.setRootLevel(Level.DEBUG);
+        logger.debug("Debug message 3");
+        assertEventCount(events, 2);
     }
 
     @Test
@@ -110,7 +252,7 @@ public class LoggerTest {
                 StringFormatterMessageFactory.INSTANCE, ParameterizedMessageFactory.INSTANCE);
         testLogger.debug("%,d", Integer.MAX_VALUE);
         final List<LogEvent> events = app.getEvents();
-        assertEquals("Incorrect number of events. Expected 1, actual " + events.size(), 1, events.size());
+        assertEventCount(events, 1);
         assertEquals(String.format("%,d", Integer.MAX_VALUE), events.get(0).getMessage().getFormattedMessage());
     }
 
@@ -119,7 +261,7 @@ public class LoggerTest {
         final Logger testLogger =  testMessageFactoryMismatch("getLogger_String_MessageFactoryMismatchNull", StringFormatterMessageFactory.INSTANCE, null);
         testLogger.debug("%,d", Integer.MAX_VALUE);
         final List<LogEvent> events = app.getEvents();
-        assertEquals("Incorrect number of events. Expected 1, actual " + events.size(), 1, events.size());
+        assertEventCount(events, 1);
         assertEquals(String.format("%,d", Integer.MAX_VALUE), events.get(0).getMessage().getFormattedMessage());
     }
 
@@ -138,14 +280,14 @@ public class LoggerTest {
     public void debugObject() {
         logger.debug(new Date());
         final List<LogEvent> events = app.getEvents();
-        assertEquals("Incorrect number of events. Expected 1, actual " + events.size(), 1, events.size());
+        assertEventCount(events, 1);
     }
 
     @Test
     public void debugWithParms() {
         logger.debug("Hello, {}", "World");
         final List<LogEvent> events = app.getEvents();
-        assertEquals("Incorrect number of events. Expected 1, actual " + events.size(), 1, events.size());
+        assertEventCount(events, 1);
     }
 
     @Test
@@ -177,7 +319,7 @@ public class LoggerTest {
         ThreadContext.clearMap();
         logger.debug("Debug message");
         final List<LogEvent> events = app.getEvents();
-        assertEquals("Incorrect number of events. Expected 2, actual " + events.size(), 2, events.size());
+        assertEventCount(events, 2);
     }
 
     @Test
@@ -192,7 +334,7 @@ public class LoggerTest {
         logger.info(MarkerManager.getMarker("EVENT"), msg);
         ThreadContext.clearMap();
         final List<LogEvent> events = app.getEvents();
-        assertEquals("Incorrect number of events. Expected 1, actual " + events.size(), 1, events.size());
+        assertEventCount(events, 1);
     }
 
     @Test
@@ -209,7 +351,7 @@ public class LoggerTest {
         }
         Thread.sleep(100);
         for (int i = 0; i < 20; i++) {
-            if (context.getConfiguration() == oldConfig) {
+            if (context.getConfiguration() != oldConfig) {
                 break;
             }
             Thread.sleep(50);
@@ -224,7 +366,7 @@ public class LoggerTest {
         final Logger localLogger = context.getLogger("org.apache.test");
         localLogger.error("Test parent additivity");
         final List<LogEvent> events = app.getEvents();
-        assertEquals("Incorrect number of events. Expected 1, actual " + events.size(), 1, events.size());
+        assertEventCount(events, 1);
     }
 
     @Test

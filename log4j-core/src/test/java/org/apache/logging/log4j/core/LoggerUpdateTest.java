@@ -21,7 +21,7 @@ import java.util.List;
 import org.apache.logging.log4j.*;
 import org.apache.logging.log4j.core.config.Configuration;
 import org.apache.logging.log4j.core.config.LoggerConfig;
-import org.apache.logging.log4j.junit.InitialLoggerContext;
+import org.apache.logging.log4j.junit.LoggerContextRule;
 import org.apache.logging.log4j.test.appender.ListAppender;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -38,7 +38,7 @@ public class LoggerUpdateTest {
     private ListAppender app;
 
     @ClassRule
-    public static InitialLoggerContext context = new InitialLoggerContext(CONFIG);
+    public static LoggerContextRule context = new LoggerContextRule(CONFIG);
 
     @Before
     public void before() {
@@ -52,7 +52,7 @@ public class LoggerUpdateTest {
         List<LogEvent> events = app.getEvents();
         assertEquals("Incorrect number of events. Expected 1, actual " + events.size(), 1, events.size());
         app.clear();
-        final LoggerContext ctx = (LoggerContext) LogManager.getContext(false);
+        final LoggerContext ctx = LoggerContext.getContext(false);
         final Configuration config = ctx.getConfiguration();
         final LoggerConfig loggerConfig = config.getLoggerConfig(LogManager.ROOT_LOGGER_NAME);
         /* You could also specify the actual logger name as below and it will return the LoggerConfig used by the Logger.

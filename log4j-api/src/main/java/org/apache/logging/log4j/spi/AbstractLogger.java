@@ -26,13 +26,14 @@ import org.apache.logging.log4j.message.MessageFactory;
 import org.apache.logging.log4j.message.ParameterizedMessageFactory;
 import org.apache.logging.log4j.message.StringFormattedMessage;
 import org.apache.logging.log4j.status.StatusLogger;
+import org.apache.logging.log4j.util.LambdaUtil;
+import org.apache.logging.log4j.util.MessageSupplier;
+import org.apache.logging.log4j.util.Supplier;
 
 /**
  * Base implementation of a Logger. It is highly recommended that any Logger implementation extend this class.
  */
 public abstract class AbstractLogger implements ExtendedLogger, Serializable {
-
-    private static final long serialVersionUID = 2L;
 
     /**
      * Marker for flow tracing.
@@ -67,41 +68,16 @@ public abstract class AbstractLogger implements ExtendedLogger, Serializable {
     /**
      * The default MessageFactory class.
      */
-    public static final Class<? extends MessageFactory> DEFAULT_MESSAGE_FACTORY_CLASS = ParameterizedMessageFactory.class;
+    public static final Class<? extends MessageFactory> DEFAULT_MESSAGE_FACTORY_CLASS =
+            ParameterizedMessageFactory.class;
+
+    private static final long serialVersionUID = 2L;
 
     private static final String FQCN = AbstractLogger.class.getName();
-
     private static final String THROWING = "throwing";
-
     private static final String CATCHING = "catching";
 
-    /**
-     * Checks that the message factory a logger was created with is the same as the given messageFactory. If they are
-     * different log a warning to the {@linkplain StatusLogger}. A null MessageFactory translates to the default
-     * MessageFactory {@link #DEFAULT_MESSAGE_FACTORY_CLASS}.
-     *
-     * @param logger The logger to check
-     * @param messageFactory The message factory to check.
-     */
-    public static void checkMessageFactory(final ExtendedLogger logger, final MessageFactory messageFactory) {
-        final String name = logger.getName();
-        final MessageFactory loggerMessageFactory = logger.getMessageFactory();
-        if (messageFactory != null && !loggerMessageFactory.equals(messageFactory)) {
-            StatusLogger.getLogger().warn(
-                    "The Logger {} was created with the message factory {} and is now requested with the "
-                            + "message factory {}, which may create log events with unexpected formatting.", name,
-                    loggerMessageFactory, messageFactory);
-        } else if (messageFactory == null && !loggerMessageFactory.getClass().equals(DEFAULT_MESSAGE_FACTORY_CLASS)) {
-            StatusLogger
-                    .getLogger()
-                    .warn("The Logger {} was created with the message factory {} and is now requested with a null "
-                            + "message factory (defaults to {}), which may create log events with unexpected formatting.",
-                            name, loggerMessageFactory, DEFAULT_MESSAGE_FACTORY_CLASS.getName());
-        }
-    }
-
     private final String name;
-
     private final MessageFactory messageFactory;
 
     /**
@@ -131,6 +107,32 @@ public abstract class AbstractLogger implements ExtendedLogger, Serializable {
     public AbstractLogger(final String name, final MessageFactory messageFactory) {
         this.name = name;
         this.messageFactory = messageFactory == null ? createDefaultMessageFactory() : messageFactory;
+    }
+
+    /**
+     * Checks that the message factory a logger was created with is the same as the given messageFactory. If they are
+     * different log a warning to the {@linkplain StatusLogger}. A null MessageFactory translates to the default
+     * MessageFactory {@link #DEFAULT_MESSAGE_FACTORY_CLASS}.
+     *
+     * @param logger The logger to check
+     * @param messageFactory The message factory to check.
+     */
+    public static void checkMessageFactory(final ExtendedLogger logger, final MessageFactory messageFactory) {
+        final String name = logger.getName();
+        final MessageFactory loggerMessageFactory = logger.getMessageFactory();
+        if (messageFactory != null && !loggerMessageFactory.equals(messageFactory)) {
+            StatusLogger.getLogger().warn(
+                    "The Logger {} was created with the message factory {} and is now requested with the "
+                            + "message factory {}, which may create log events with unexpected formatting.", name,
+                    loggerMessageFactory, messageFactory);
+        } else if (messageFactory == null && !loggerMessageFactory.getClass().equals(DEFAULT_MESSAGE_FACTORY_CLASS)) {
+            StatusLogger
+                    .getLogger()
+                    .warn("The Logger {} was created with the message factory {} and is now requested with a null "
+                            + "message factory (defaults to {}), which may create log events with unexpected "
+                            + "formatting.",
+                            name, loggerMessageFactory, DEFAULT_MESSAGE_FACTORY_CLASS.getName());
+        }
     }
 
     @Override
@@ -243,6 +245,56 @@ public abstract class AbstractLogger implements ExtendedLogger, Serializable {
     }
 
     @Override
+    public void debug(final Supplier<?> msgSupplier) {
+        logIfEnabled(FQCN, Level.DEBUG, null, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void debug(final Supplier<?> msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.DEBUG, null, msgSupplier, t);
+    }
+
+    @Override
+    public void debug(final Marker marker, final Supplier<?> msgSupplier) {
+        logIfEnabled(FQCN, Level.DEBUG, marker, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void debug(final Marker marker, final String message, final Supplier<?>... paramSuppliers) {
+        logIfEnabled(FQCN, Level.DEBUG, marker, message, paramSuppliers);
+    }
+
+    @Override
+    public void debug(final Marker marker, final Supplier<?> msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.DEBUG, marker, msgSupplier, t);
+    }
+
+    @Override
+    public void debug(final String message, final Supplier<?>... paramSuppliers) {
+        logIfEnabled(FQCN, Level.DEBUG, null, message, paramSuppliers);
+    }
+
+    @Override
+    public void debug(final Marker marker, final MessageSupplier msgSupplier) {
+        logIfEnabled(FQCN, Level.DEBUG, marker, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void debug(final Marker marker, final MessageSupplier msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.DEBUG, marker, msgSupplier, t);
+    }
+
+    @Override
+    public void debug(final MessageSupplier msgSupplier) {
+        logIfEnabled(FQCN, Level.DEBUG, null, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void debug(final MessageSupplier msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.DEBUG, null, msgSupplier, t);
+    }
+
+    @Override
     public void entry() {
         entry(FQCN);
     }
@@ -269,14 +321,10 @@ public abstract class AbstractLogger implements ExtendedLogger, Serializable {
             return messageFactory.newMessage("entry");
         }
         final StringBuilder sb = new StringBuilder("entry params(");
-        int i = 0;
-        for (final Object parm : params) {
-            if (parm != null) {
-                sb.append(parm.toString());
-            } else {
-                sb.append("null");
-            }
-            if (++i < params.length) {
+        for (int i = 0; i < params.length; i++) {
+            Object parm = params[i];
+            sb.append(parm != null ? parm.toString() : "null");
+            if (i + 1 < params.length) {
                 sb.append(", ");
             }
         }
@@ -352,6 +400,56 @@ public abstract class AbstractLogger implements ExtendedLogger, Serializable {
     @Override
     public void error(final String message, final Throwable t) {
         logIfEnabled(FQCN, Level.ERROR, null, message, t);
+    }
+
+    @Override
+    public void error(final Supplier<?> msgSupplier) {
+        logIfEnabled(FQCN, Level.ERROR, null, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void error(final Supplier<?> msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.ERROR, null, msgSupplier, t);
+    }
+
+    @Override
+    public void error(final Marker marker, final Supplier<?> msgSupplier) {
+        logIfEnabled(FQCN, Level.ERROR, marker, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void error(final Marker marker, final String message, final Supplier<?>... paramSuppliers) {
+        logIfEnabled(FQCN, Level.ERROR, marker, message, paramSuppliers);
+    }
+
+    @Override
+    public void error(final Marker marker, final Supplier<?> msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.ERROR, marker, msgSupplier, t);
+    }
+
+    @Override
+    public void error(final String message, final Supplier<?>... paramSuppliers) {
+        logIfEnabled(FQCN, Level.ERROR, null, message, paramSuppliers);
+    }
+
+    @Override
+    public void error(final Marker marker, final MessageSupplier msgSupplier) {
+        logIfEnabled(FQCN, Level.ERROR, marker, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void error(final Marker marker, final MessageSupplier msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.ERROR, marker, msgSupplier, t);
+    }
+
+    @Override
+    public void error(final MessageSupplier msgSupplier) {
+        logIfEnabled(FQCN, Level.ERROR, null, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void error(final MessageSupplier msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.ERROR, null, msgSupplier, t);
     }
 
     @Override
@@ -457,6 +555,56 @@ public abstract class AbstractLogger implements ExtendedLogger, Serializable {
     }
 
     @Override
+    public void fatal(final Supplier<?> msgSupplier) {
+        logIfEnabled(FQCN, Level.FATAL, null, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void fatal(final Supplier<?> msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.FATAL, null, msgSupplier, t);
+    }
+
+    @Override
+    public void fatal(final Marker marker, final Supplier<?> msgSupplier) {
+        logIfEnabled(FQCN, Level.FATAL, marker, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void fatal(final Marker marker, final String message, final Supplier<?>... paramSuppliers) {
+        logIfEnabled(FQCN, Level.FATAL, marker, message, paramSuppliers);
+    }
+
+    @Override
+    public void fatal(final Marker marker, final Supplier<?> msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.FATAL, marker, msgSupplier, t);
+    }
+
+    @Override
+    public void fatal(final String message, final Supplier<?>... paramSuppliers) {
+        logIfEnabled(FQCN, Level.FATAL, null, message, paramSuppliers);
+    }
+
+    @Override
+    public void fatal(final Marker marker, final MessageSupplier msgSupplier) {
+        logIfEnabled(FQCN, Level.FATAL, marker, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void fatal(final Marker marker, final MessageSupplier msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.FATAL, marker, msgSupplier, t);
+    }
+
+    @Override
+    public void fatal(final MessageSupplier msgSupplier) {
+        logIfEnabled(FQCN, Level.FATAL, null, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void fatal(final MessageSupplier msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.FATAL, null, msgSupplier, t);
+    }
+
+    @Override
     public MessageFactory getMessageFactory() {
         return messageFactory;
     }
@@ -534,6 +682,56 @@ public abstract class AbstractLogger implements ExtendedLogger, Serializable {
     @Override
     public void info(final String message, final Throwable t) {
         logIfEnabled(FQCN, Level.INFO, null, message, t);
+    }
+
+    @Override
+    public void info(final Supplier<?> msgSupplier) {
+        logIfEnabled(FQCN, Level.INFO, null, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void info(final Supplier<?> msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.INFO, null, msgSupplier, t);
+    }
+
+    @Override
+    public void info(final Marker marker, final Supplier<?> msgSupplier) {
+        logIfEnabled(FQCN, Level.INFO, marker, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void info(final Marker marker, final String message, final Supplier<?>... paramSuppliers) {
+        logIfEnabled(FQCN, Level.INFO, marker, message, paramSuppliers);
+    }
+
+    @Override
+    public void info(final Marker marker, final Supplier<?> msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.INFO, marker, msgSupplier, t);
+    }
+
+    @Override
+    public void info(final String message, final Supplier<?>... paramSuppliers) {
+        logIfEnabled(FQCN, Level.INFO, null, message, paramSuppliers);
+    }
+
+    @Override
+    public void info(final Marker marker, final MessageSupplier msgSupplier) {
+        logIfEnabled(FQCN, Level.INFO, marker, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void info(final Marker marker, final MessageSupplier msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.INFO, marker, msgSupplier, t);
+    }
+
+    @Override
+    public void info(final MessageSupplier msgSupplier) {
+        logIfEnabled(FQCN, Level.INFO, null, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void info(final MessageSupplier msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.INFO, null, msgSupplier, t);
     }
 
     @Override
@@ -679,10 +877,68 @@ public abstract class AbstractLogger implements ExtendedLogger, Serializable {
     }
 
     @Override
+    public void log(final Level level, final Supplier<?> msgSupplier) {
+        logIfEnabled(FQCN, level, null, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void log(final Level level, final Supplier<?> msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, level, null, msgSupplier, t);
+    }
+
+    @Override
+    public void log(final Level level, final Marker marker, final Supplier<?> msgSupplier) {
+        logIfEnabled(FQCN, level, marker, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void log(final Level level, final Marker marker, final String message, final Supplier<?>... paramSuppliers) {
+        logIfEnabled(FQCN, level, marker, message, paramSuppliers);
+    }
+
+    @Override
+    public void log(final Level level, final Marker marker, final Supplier<?> msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, level, marker, msgSupplier, t);
+    }
+
+    @Override
+    public void log(final Level level, final String message, final Supplier<?>... paramSuppliers) {
+        logIfEnabled(FQCN, level, null, message, paramSuppliers);
+    }
+
+    @Override
+    public void log(final Level level, final Marker marker, final MessageSupplier msgSupplier) {
+        logIfEnabled(FQCN, level, marker, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void log(final Level level, final Marker marker, final MessageSupplier msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, level, marker, msgSupplier, t);
+    }
+
+    @Override
+    public void log(final Level level, final MessageSupplier msgSupplier) {
+        logIfEnabled(FQCN, level, null, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void log(final Level level, final MessageSupplier msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, level, null, msgSupplier, t);
+    }
+
+    @Override
     public void logIfEnabled(final String fqcn, final Level level, final Marker marker, final Message msg,
             final Throwable t) {
         if (isEnabled(level, marker, msg, t)) {
             logMessage(fqcn, level, marker, msg, t);
+        }
+    }
+
+    @Override
+    public void logIfEnabled(final String fqcn, final Level level, final Marker marker,
+            final MessageSupplier msgSupplier, final Throwable t) {
+        if (isEnabled(level, marker, msgSupplier, t)) {
+            logMessage(fqcn, level, marker, msgSupplier, t);
         }
     }
 
@@ -695,9 +951,25 @@ public abstract class AbstractLogger implements ExtendedLogger, Serializable {
     }
 
     @Override
+    public void logIfEnabled(final String fqcn, final Level level, final Marker marker, final Supplier<?> msgSupplier,
+            final Throwable t) {
+        if (isEnabled(level, marker, msgSupplier, t)) {
+            logMessage(fqcn, level, marker, msgSupplier, t);
+        }
+    }
+
+    @Override
     public void logIfEnabled(final String fqcn, final Level level, final Marker marker, final String message) {
         if (isEnabled(level, marker, message)) {
             logMessage(fqcn, level, marker, message);
+        }
+    }
+
+    @Override
+    public void logIfEnabled(final String fqcn, final Level level, final Marker marker, final String message,
+            final Supplier<?>... paramSuppliers) {
+        if (isEnabled(level, marker, message)) {
+            logMessage(fqcn, level, marker, message, paramSuppliers);
         }
     }
 
@@ -722,6 +994,18 @@ public abstract class AbstractLogger implements ExtendedLogger, Serializable {
         logMessage(fqcn, level, marker, messageFactory.newMessage(message), t);
     }
 
+    protected void logMessage(final String fqcn, final Level level, final Marker marker,
+            final MessageSupplier msgSupplier, final Throwable t) {
+        final Message message = LambdaUtil.get(msgSupplier);
+        logMessage(fqcn, level, marker, message, t);
+    }
+
+    protected void logMessage(final String fqcn, final Level level, final Marker marker, final Supplier<?> msgSupplier,
+            final Throwable t) {
+        final Object message = LambdaUtil.get(msgSupplier);
+        logMessage(fqcn, level, marker, messageFactory.newMessage(message), t);
+    }
+
     protected void logMessage(final String fqcn, final Level level, final Marker marker, final String message,
             final Throwable t) {
         logMessage(fqcn, level, marker, messageFactory.newMessage(message), t);
@@ -735,6 +1019,12 @@ public abstract class AbstractLogger implements ExtendedLogger, Serializable {
     protected void logMessage(final String fqcn, final Level level, final Marker marker, final String message,
             final Object... params) {
         final Message msg = messageFactory.newMessage(message, params);
+        logMessage(fqcn, level, marker, msg, msg.getThrowable());
+    }
+
+    protected void logMessage(final String fqcn, final Level level, final Marker marker, final String message,
+            final Supplier<?>... paramSuppliers) {
+        final Message msg = messageFactory.newMessage(message, LambdaUtil.getAll(paramSuppliers));
         logMessage(fqcn, level, marker, msg, msg.getThrowable());
     }
 
@@ -855,6 +1145,56 @@ public abstract class AbstractLogger implements ExtendedLogger, Serializable {
     }
 
     @Override
+    public void trace(final Supplier<?> msgSupplier) {
+        logIfEnabled(FQCN, Level.TRACE, null, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void trace(final Supplier<?> msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.TRACE, null, msgSupplier, t);
+    }
+
+    @Override
+    public void trace(final Marker marker, final Supplier<?> msgSupplier) {
+        logIfEnabled(FQCN, Level.TRACE, marker, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void trace(final Marker marker, final String message, final Supplier<?>... paramSuppliers) {
+        logIfEnabled(FQCN, Level.TRACE, marker, message, paramSuppliers);
+    }
+
+    @Override
+    public void trace(final Marker marker, final Supplier<?> msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.TRACE, marker, msgSupplier, t);
+    }
+
+    @Override
+    public void trace(final String message, final Supplier<?>... paramSuppliers) {
+        logIfEnabled(FQCN, Level.TRACE, null, message, paramSuppliers);
+    }
+
+    @Override
+    public void trace(final Marker marker, final MessageSupplier msgSupplier) {
+        logIfEnabled(FQCN, Level.TRACE, marker, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void trace(final Marker marker, final MessageSupplier msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.TRACE, marker, msgSupplier, t);
+    }
+
+    @Override
+    public void trace(final MessageSupplier msgSupplier) {
+        logIfEnabled(FQCN, Level.TRACE, null, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void trace(final MessageSupplier msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.TRACE, null, msgSupplier, t);
+    }
+
+    @Override
     public void warn(final Marker marker, final Message msg) {
         logIfEnabled(FQCN, Level.WARN, marker, msg, null);
     }
@@ -868,11 +1208,6 @@ public abstract class AbstractLogger implements ExtendedLogger, Serializable {
     public void warn(final Marker marker, final Object message) {
         logIfEnabled(FQCN, Level.WARN, marker, message, null);
     }
-
-    /* -- FIXME: this comment looks lost
-     * Instead of one single method with Object... declared the following methods explicitly specify parameters because
-     * they perform dramatically better than having the JVM convert them to an array.
-     */
 
     @Override
     public void warn(final Marker marker, final Object message, final Throwable t) {
@@ -929,4 +1264,53 @@ public abstract class AbstractLogger implements ExtendedLogger, Serializable {
         logIfEnabled(FQCN, Level.WARN, null, message, t);
     }
 
+    @Override
+    public void warn(final Supplier<?> msgSupplier) {
+        logIfEnabled(FQCN, Level.WARN, null, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void warn(final Supplier<?> msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.WARN, null, msgSupplier, t);
+    }
+
+    @Override
+    public void warn(final Marker marker, final Supplier<?> msgSupplier) {
+        logIfEnabled(FQCN, Level.WARN, marker, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void warn(final Marker marker, final String message, final Supplier<?>... paramSuppliers) {
+        logIfEnabled(FQCN, Level.WARN, marker, message, paramSuppliers);
+    }
+
+    @Override
+    public void warn(final Marker marker, final Supplier<?> msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.WARN, marker, msgSupplier, t);
+    }
+
+    @Override
+    public void warn(final String message, final Supplier<?>... paramSuppliers) {
+        logIfEnabled(FQCN, Level.WARN, null, message, paramSuppliers);
+    }
+
+    @Override
+    public void warn(final Marker marker, final MessageSupplier msgSupplier) {
+        logIfEnabled(FQCN, Level.WARN, marker, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void warn(final Marker marker, final MessageSupplier msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.WARN, marker, msgSupplier, t);
+    }
+
+    @Override
+    public void warn(final MessageSupplier msgSupplier) {
+        logIfEnabled(FQCN, Level.WARN, null, msgSupplier, (Throwable) null);
+    }
+
+    @Override
+    public void warn(final MessageSupplier msgSupplier, final Throwable t) {
+        logIfEnabled(FQCN, Level.WARN, null, msgSupplier, t);
+    }
 }

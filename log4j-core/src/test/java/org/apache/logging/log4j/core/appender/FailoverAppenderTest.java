@@ -20,12 +20,12 @@ import java.util.List;
 
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.LogEvent;
-import org.apache.logging.log4j.junit.InitialLoggerContext;
+import org.apache.logging.log4j.junit.LoggerContextRule;
 import org.apache.logging.log4j.test.appender.FailOnceAppender;
 import org.apache.logging.log4j.test.appender.ListAppender;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
+import org.junit.ClassRule;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -39,15 +39,15 @@ public class FailoverAppenderTest {
     private Logger logger;
     private Logger onceLogger;
 
-    @Rule
-    public InitialLoggerContext init = new InitialLoggerContext("log4j-failover.xml");
+    @ClassRule
+    public static LoggerContextRule init = new LoggerContextRule("log4j-failover.xml");
 
     @Before
     public void setUp() throws Exception {
-        app = this.init.getListAppender("List");
-        foApp = (FailOnceAppender) this.init.getAppender("Once");
-        logger = this.init.getLogger("LoggerTest");
-        onceLogger = this.init.getLogger("Once");
+        app = init.getListAppender("List");
+        foApp = (FailOnceAppender) init.getAppender("Once");
+        logger = init.getLogger("LoggerTest");
+        onceLogger = init.getLogger("Once");
     }
 
     @After

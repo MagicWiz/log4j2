@@ -41,18 +41,24 @@ import org.apache.logging.log4j.core.util.NullOutputStream;
  * memory and writes to this memory region.
  * <p>
  * 
- * @see <a
- *      href="http://www.codeproject.com/Tips/683614/Things-to-Know-about-Memory-Mapped-File-in-Java">http://www.codeproject.com/Tips/683614/Things-to-Know-about-Memory-Mapped-File-in-Java</a>
+ * @see <a href="http://www.codeproject.com/Tips/683614/Things-to-Know-about-Memory-Mapped-File-in-Java">
+ *      http://www.codeproject.com/Tips/683614/Things-to-Know-about-Memory-Mapped-File-in-Java</a>
  * @see <a href="http://bugs.java.com/view_bug.do?bug_id=6893654">http://bugs.java.com/view_bug.do?bug_id=6893654</a>
  * @see <a href="http://bugs.java.com/view_bug.do?bug_id=4724038">http://bugs.java.com/view_bug.do?bug_id=4724038</a>
  * @see <a
- *      href="http://stackoverflow.com/questions/9261316/memory-mapped-mappedbytebuffer-or-direct-bytebuffer-for-db-implementation">http://stackoverflow.com/questions/9261316/memory-mapped-mappedbytebuffer-or-direct-bytebuffer-for-db-implementation</a>
+ *      href="http://stackoverflow.com/questions/9261316/memory-mapped-mappedbytebuffer-or-direct-bytebuffer-for-db-implementation">
+ *      http://stackoverflow.com/questions/9261316/memory-mapped-mappedbytebuffer-or-direct-bytebuffer-for-db-implementation</a>
  * 
  * @since 2.1
  */
 public class MemoryMappedFileManager extends OutputStreamManager {
+    /**
+     * Default length of region to map.
+     */
     static final int DEFAULT_REGION_LENGTH = 32 * 1024 * 1024;
+    private static final int MAX_REMAP_COUNT = 10;
     private static final MemoryMappedFileManagerFactory FACTORY = new MemoryMappedFileManagerFactory();
+    private static final double NANOS_PER_MILLISEC = 1000.0 * 1000.0;
 
     private final boolean isForce;
     private final int regionLength;
@@ -64,8 +70,8 @@ public class MemoryMappedFileManager extends OutputStreamManager {
 
     protected MemoryMappedFileManager(final RandomAccessFile file, final String fileName, final OutputStream os,
             final boolean force, final long position, final int regionLength, final String advertiseURI,
-            final Layout<? extends Serializable> layout) throws IOException {
-        super(os, fileName, layout);
+            final Layout<? extends Serializable> layout, final boolean writeHeader) throws IOException {
+        super(os, fileName, layout, writeHeader);
         this.isForce = force;
         this.randomAccessFile = Objects.requireNonNull(file, "RandomAccessFile");
         this.regionLength = regionLength;
@@ -97,8 +103,8 @@ public class MemoryMappedFileManager extends OutputStreamManager {
         return isEndOfBatch.get();
     }
 
-    public void setEndOfBatch(final boolean isEndOfBatch) {
-        this.isEndOfBatch.set(Boolean.valueOf(isEndOfBatch));
+    public void setEndOfBatch(final boolean endOfBatch) {
+        this.isEndOfBatch.set(Boolean.valueOf(endOfBatch));
     }
 
     @Override
@@ -128,7 +134,7 @@ public class MemoryMappedFileManager extends OutputStreamManager {
 
             final long startNanos = System.nanoTime();
             randomAccessFile.setLength(fileLength);
-            final float millis = (float) ((System.nanoTime() - startNanos) / (1000.0 * 1000.0));
+            final float millis = (float) ((System.nanoTime() - startNanos) / NANOS_PER_MILLISEC);
             LOGGER.debug("MMapAppender extended {} OK in {} millis", getFileName(), millis);
 
             mappedBuffer = mmap(randomAccessFile.getChannel(), getFileName(), offset, length);
@@ -172,7 +178,7 @@ public class MemoryMappedFileManager extends OutputStreamManager {
                 final MappedByteBuffer map = fileChannel.map(FileChannel.MapMode.READ_WRITE, start, size);
                 map.order(ByteOrder.nativeOrder());
 
-                final float millis = (float) ((System.nanoTime() - startNanos) / (1000.0 * 1000.0));
+                final float millis = (float) ((System.nanoTime() - startNanos) / NANOS_PER_MILLISEC);
                 LOGGER.debug("MMapAppender remapped {} OK in {} millis", fileName, millis);
 
                 return map;
@@ -180,8 +186,8 @@ public class MemoryMappedFileManager extends OutputStreamManager {
                 if (e.getMessage() == null || !e.getMessage().endsWith("user-mapped section open")) {
                     throw e;
                 }
-                LOGGER.debug("Remap attempt {}/10 failed. Retrying...", i, e);
-                if (i < 10) {
+                LOGGER.debug("Remap attempt {}/{} failed. Retrying...", i, MAX_REMAP_COUNT, e);
+                if (i < MAX_REMAP_COUNT) {
                     Thread.yield();
                 } else {
                     try {
@@ -209,7 +215,7 @@ public class MemoryMappedFileManager extends OutputStreamManager {
                 return null;
             }
         });
-        final float millis = (float) ((System.nanoTime() - startNanos) / (1000.0 * 1000.0));
+        final float millis = (float) ((System.nanoTime() - startNanos) / NANOS_PER_MILLISEC);
         LOGGER.debug("MMapAppender unmapped buffer OK in {} millis", millis);
     }
 
@@ -286,7 +292,8 @@ public class MemoryMappedFileManager extends OutputStreamManager {
     /**
      * Factory to create a MemoryMappedFileManager.
      */
-    private static class MemoryMappedFileManagerFactory implements ManagerFactory<MemoryMappedFileManager, FactoryData> {
+    private static class MemoryMappedFileManagerFactory
+            implements ManagerFactory<MemoryMappedFileManager, FactoryData> {
 
         /**
          * Create a MemoryMappedFileManager.
@@ -307,6 +314,7 @@ public class MemoryMappedFileManager extends OutputStreamManager {
                 file.delete();
             }
 
+            final boolean writeHeader = !data.append || !file.exists();
             final OutputStream os = NullOutputStream.NULL_OUTPUT_STREAM;
             RandomAccessFile raf = null;
             try {
@@ -314,7 +322,7 @@ public class MemoryMappedFileManager extends OutputStreamManager {
                 final long position = (data.append) ? raf.length() : 0;
                 raf.setLength(position + data.regionLength);
                 return new MemoryMappedFileManager(raf, name, os, data.force, position, data.regionLength,
-                        data.advertiseURI, data.layout);
+                        data.advertiseURI, data.layout, writeHeader);
             } catch (final Exception ex) {
                 LOGGER.error("MemoryMappedFileManager (" + name + ") " + ex);
                 Closer.closeSilently(raf);

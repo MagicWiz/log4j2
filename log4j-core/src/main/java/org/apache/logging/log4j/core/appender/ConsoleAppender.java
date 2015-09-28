@@ -39,14 +39,12 @@ import org.apache.logging.log4j.core.util.Loader;
 import org.apache.logging.log4j.util.PropertiesUtil;
 
 /**
- * ConsoleAppender appends log events to <code>System.out</code> or
- * <code>System.err</code> using a layout specified by the user. The
+ * Appends log events to <code>System.out</code> or <code>System.err</code> using a layout specified by the user. The
  * default target is <code>System.out</code>.
- * TODO accessing System.out or .err as a byte stream instead of a writer
- *    bypasses the JVM's knowledge of the proper encoding. (RG) Encoding
- * is handled within the Layout. Typically, a Layout will generate a String
- * and then call getBytes which may use a configured encoding or the system
- * default. OTOH, a Writer cannot print byte streams.
+ * <p>
+ * TODO accessing System.out or .err as a byte stream instead of a writer bypasses the JVM's knowledge of the proper
+ * encoding. (RG) Encoding is handled within the Layout. Typically, a Layout will generate a String and then call
+ * getBytes which may use a configured encoding or the system default. OTOH, a Writer cannot print byte streams.
  */
 @Plugin(name = "Console", category = "Core", elementType = "appender", printObject = true)
 public final class ConsoleAppender extends AbstractOutputStreamAppender<OutputStreamManager> {
@@ -59,7 +57,7 @@ public final class ConsoleAppender extends AbstractOutputStreamAppender<OutputSt
     /**
      * Enumeration of console destinations.
      */
-    public enum Target {
+    public static enum Target {
         /** Standard output. */
         SYSTEM_OUT,
         /** Standard error output. */
@@ -67,25 +65,24 @@ public final class ConsoleAppender extends AbstractOutputStreamAppender<OutputSt
     }
 
     private ConsoleAppender(final String name, final Layout<? extends Serializable> layout, final Filter filter,
-                            final OutputStreamManager manager,
-                            final boolean ignoreExceptions) {
+            final OutputStreamManager manager, final boolean ignoreExceptions) {
         super(name, layout, filter, ignoreExceptions, true, manager);
     }
 
     /**
-     * Create a Console Appender.
+     * Creates a Console Appender.
+     * 
      * @param layout The layout to use (required).
      * @param filter The Filter or null.
      * @param targetStr The target ("SYSTEM_OUT" or "SYSTEM_ERR"). The default is "SYSTEM_OUT".
      * @param follow If true will follow changes to the underlying output stream.
      * @param name The name of the Appender (required).
-     * @param ignore If {@code "true"} (default) exceptions encountered when appending events are logged; otherwise
-     *               they are propagated to the caller.
+     * @param ignore If {@code "true"} (default) exceptions encountered when appending events are logged; otherwise they
+     *            are propagated to the caller.
      * @return The ConsoleAppender.
      */
     @PluginFactory
-    public static ConsoleAppender createAppender(
-            @PluginElement("Layout") Layout<? extends Serializable> layout,
+    public static ConsoleAppender createAppender(@PluginElement("Layout") Layout<? extends Serializable> layout,
             @PluginElement("Filter") final Filter filter,
             @PluginAttribute(value = "target", defaultString = "SYSTEM_OUT") final String targetStr,
             @PluginAttribute("name") final String name,
@@ -101,12 +98,12 @@ public final class ConsoleAppender extends AbstractOutputStreamAppender<OutputSt
         final boolean isFollow = Boolean.parseBoolean(follow);
         final boolean ignoreExceptions = Booleans.parseBoolean(ignore, true);
         final Target target = targetStr == null ? DEFAULT_TARGET : Target.valueOf(targetStr);
-        return new ConsoleAppender(name, layout, filter, getManager(isFollow, target, layout), ignoreExceptions);
+        return new ConsoleAppender(name, layout, filter, getManager(target, isFollow, layout), ignoreExceptions);
     }
 
     public static ConsoleAppender createDefaultAppenderForLayout(final Layout<? extends Serializable> layout) {
         // this method cannot use the builder class without introducing an infinite loop due to DefaultConfiguration
-        return new ConsoleAppender("Console", layout, null, getManager(false, DEFAULT_TARGET, layout), true);
+        return new ConsoleAppender("Console", layout, null, getManager(DEFAULT_TARGET, false, layout), true);
     }
 
     @PluginBuilderFactory
@@ -114,6 +111,9 @@ public final class ConsoleAppender extends AbstractOutputStreamAppender<OutputSt
         return new Builder();
     }
 
+    /**
+     * Builds ConsoleAppender instances.
+     */
     public static class Builder implements org.apache.logging.log4j.core.util.Builder<ConsoleAppender> {
 
         @PluginElement("Layout")
@@ -137,46 +137,47 @@ public final class ConsoleAppender extends AbstractOutputStreamAppender<OutputSt
         @PluginBuilderAttribute
         private boolean ignoreExceptions = true;
 
-        public Builder setLayout(final Layout<? extends Serializable> layout) {
-            this.layout = layout;
+        public Builder setLayout(final Layout<? extends Serializable> aLayout) {
+            this.layout = aLayout;
             return this;
         }
 
-        public Builder setFilter(final Filter filter) {
-            this.filter = filter;
+        public Builder setFilter(final Filter aFilter) {
+            this.filter = aFilter;
             return this;
         }
 
-        public Builder setTarget(final Target target) {
-            this.target = target;
+        public Builder setTarget(final Target aTarget) {
+            this.target = aTarget;
             return this;
         }
 
-        public Builder setName(final String name) {
-            this.name = name;
+        public Builder setName(final String aName) {
+            this.name = aName;
             return this;
         }
 
-        public Builder setFollow(final boolean follow) {
-            this.follow = follow;
+        public Builder setFollow(final boolean shouldFollow) {
+            this.follow = shouldFollow;
             return this;
         }
 
-        public Builder setIgnoreExceptions(final boolean ignoreExceptions) {
-            this.ignoreExceptions = ignoreExceptions;
+        public Builder setIgnoreExceptions(final boolean shouldIgnoreExceptions) {
+            this.ignoreExceptions = shouldIgnoreExceptions;
             return this;
         }
 
         @Override
         public ConsoleAppender build() {
-            return new ConsoleAppender(name, layout, filter, getManager(follow, target, layout), ignoreExceptions);
+            return new ConsoleAppender(name, layout, filter, getManager(target, follow, layout), ignoreExceptions);
         }
     }
 
-    private static OutputStreamManager getManager(final boolean follow, final Target target, final Layout<? extends Serializable> layout) {
-        final String type = target.name();
+    private static OutputStreamManager getManager(final Target target, final boolean follow,
+            final Layout<? extends Serializable> layout) {
         final OutputStream os = getOutputStream(follow, target);
-        return OutputStreamManager.getManager(target.name() + '.' + follow, new FactoryData(os, type, layout), factory);
+        final String managerName = target.name() + '.' + follow;
+        return OutputStreamManager.getManager(managerName, new FactoryData(os, managerName, layout), factory);
     }
 
     private static OutputStream getOutputStream(final boolean follow, final Target target) {
@@ -235,8 +236,7 @@ public final class ConsoleAppender extends AbstractOutputStreamAppender<OutputSt
         }
 
         @Override
-        public void write(final byte[] b, final int off, final int len)
-            throws IOException {
+        public void write(final byte[] b, final int off, final int len) throws IOException {
             System.err.write(b, off, len);
         }
 
@@ -269,8 +269,7 @@ public final class ConsoleAppender extends AbstractOutputStreamAppender<OutputSt
         }
 
         @Override
-        public void write(final byte[] b, final int off, final int len)
-            throws IOException {
+        public void write(final byte[] b, final int off, final int len) throws IOException {
             System.out.write(b, off, len);
         }
 
@@ -279,7 +278,7 @@ public final class ConsoleAppender extends AbstractOutputStreamAppender<OutputSt
             System.out.write(b);
         }
     }
-    
+
     /**
      * A delegating OutputStream that does not close its delegate.
      */
@@ -307,8 +306,7 @@ public final class ConsoleAppender extends AbstractOutputStreamAppender<OutputSt
         }
 
         @Override
-        public void write(final byte[] b, final int off, final int len)
-                throws IOException {
+        public void write(final byte[] b, final int off, final int len) throws IOException {
             delegate.write(b, off, len);
         }
 
@@ -328,6 +326,7 @@ public final class ConsoleAppender extends AbstractOutputStreamAppender<OutputSt
 
         /**
          * Constructor.
+         * 
          * @param os The OutputStream.
          * @param type The name of the target.
          * @param layout A Serializable layout
@@ -346,13 +345,14 @@ public final class ConsoleAppender extends AbstractOutputStreamAppender<OutputSt
 
         /**
          * Create an OutputStreamManager.
+         * 
          * @param name The name of the entity to manage.
          * @param data The data required to create the entity.
          * @return The OutputStreamManager
          */
         @Override
         public OutputStreamManager createManager(final String name, final FactoryData data) {
-            return new OutputStreamManager(data.os, data.type, data.layout);
+            return new OutputStreamManager(data.os, data.type, data.layout, true);
         }
     }
 

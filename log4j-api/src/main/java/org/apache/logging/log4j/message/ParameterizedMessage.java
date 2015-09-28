@@ -210,7 +210,7 @@ public class ParameterizedMessage implements Message {
     }
 
     protected String formatMessage(final String msgPattern, final String[] sArgs) {
-        return format(msgPattern, sArgs);
+        return formatStringArgs(msgPattern, sArgs);
     }
 
     @Override
@@ -253,53 +253,214 @@ public class ParameterizedMessage implements Message {
         if (messagePattern == null || arguments == null || arguments.length == 0) {
             return messagePattern;
         }
+        if (arguments instanceof String[]) {
+            return formatStringArgs(messagePattern, (String[]) arguments);
+        }
+        final String[] stringArgs = new String[arguments.length];
+        for (int i = 0; i < arguments.length; i++) {
+            stringArgs[i] = String.valueOf(arguments[i]);
+        }
+        return formatStringArgs(messagePattern, stringArgs);
+    }
 
-        final StringBuilder result = new StringBuilder();
+    /**
+     * Replace placeholders in the given messagePattern with arguments.
+     * <p>
+     * Package protected for unit tests.
+     *
+     * @param messagePattern the message pattern containing placeholders.
+     * @param arguments      the arguments to be used to replace placeholders.
+     * @return the formatted message.
+     */
+    // Profiling showed this method is important to log4j performance. Modify with care!
+    // 33 bytes (allows immediate JVM inlining: < 35 bytes) LOG4J2-1096
+    static String formatStringArgs(final String messagePattern, final String[] arguments) {
+        int len = 0;
+        if (messagePattern == null || (len = messagePattern.length()) == 0 || arguments == null
+                || arguments.length == 0) {
+            return messagePattern;
+        }
+
+        return formatStringArgs0(messagePattern, len, arguments);
+    }
+
+    // Profiling showed this method is important to log4j performance. Modify with care!
+    // 157 bytes (will be inlined when hot enough: < 325 bytes)
+    private static String formatStringArgs0(final String messagePattern, final int len, final String[] arguments) {
+        final char[] result = new char[len + sumStringLengths(arguments)];
+        int pos = 0;
         int escapeCounter = 0;
         int currentArgument = 0;
-        for (int i = 0; i < messagePattern.length(); i++) {
+        int i = 0;
+        for (; i < len - 1; i++) { // last char is excluded from the loop
             final char curChar = messagePattern.charAt(i);
             if (curChar == ESCAPE_CHAR) {
                 escapeCounter++;
             } else {
-                if (curChar == DELIM_START && i < messagePattern.length() - 1
-                        && messagePattern.charAt(i + 1) == DELIM_STOP) {
-                    // write escaped escape chars
-                    final int escapedEscapes = escapeCounter / 2;
-                    for (int j = 0; j < escapedEscapes; j++) {
-                        result.append(ESCAPE_CHAR);
-                    }
+                if (isDelimPair(curChar, messagePattern, i)) { // looks ahead one char
+                    i++;
 
-                    if (escapeCounter % 2 == 1) {
+                    // write escaped escape chars
+                    pos = writeEscapedEscapeChars(escapeCounter, result, pos);
+
+                    if (isOdd(escapeCounter)) {
                         // i.e. escaped
                         // write escaped escape chars
-                        result.append(DELIM_START);
-                        result.append(DELIM_STOP);
+                        pos = writeDelimPair(result, pos);
                     } else {
                         // unescaped
-                        if (currentArgument < arguments.length) {
-                            result.append(arguments[currentArgument]);
-                        } else {
-                            result.append(DELIM_START).append(DELIM_STOP);
-                        }
+                        pos = writeArgOrDelimPair(arguments, currentArgument, result, pos);
                         currentArgument++;
                     }
-                    i++;
-                    escapeCounter = 0;
-                    continue;
+                } else {
+                    pos = handleLiteralChar(result, pos, escapeCounter, curChar);
                 }
-                // any other char beside ESCAPE or DELIM_START/STOP-combo
-                // write unescaped escape chars
-                if (escapeCounter > 0) {
-                    for (int j = 0; j < escapeCounter; j++) {
-                        result.append(ESCAPE_CHAR);
-                    }
-                    escapeCounter = 0;
-                }
-                result.append(curChar);
+                escapeCounter = 0;
             }
         }
-        return result.toString();
+        pos = handleRemainingCharIfAny(messagePattern, len, result, pos, escapeCounter, i);
+        return new String(result, 0, pos);
+    }
+
+    /**
+     * Returns the sum of the lengths of all Strings in the specified array.
+     */
+    // Profiling showed this method is important to log4j performance. Modify with care!
+    // 30 bytes (allows immediate JVM inlining: < 35 bytes) LOG4J2-1096
+    private static int sumStringLengths(final String[] arguments) {
+        int result = 0;
+        for (int i = 0; i < arguments.length; i++) {
+            result += String.valueOf(arguments[i]).length();
+        }
+        return result;
+    }
+
+    /**
+     * Returns {@code true} if the specified char and the char at {@code curCharIndex + 1} in the specified message
+     * pattern together form a "{}" delimiter pair, returns {@code false} otherwise.
+     */
+    // Profiling showed this method is important to log4j performance. Modify with care!
+    // 22 bytes (allows immediate JVM inlining: < 35 bytes) LOG4J2-1096
+    private static boolean isDelimPair(final char curChar, final String messagePattern, final int curCharIndex) {
+        return curChar == DELIM_START && messagePattern.charAt(curCharIndex + 1) == DELIM_STOP;
+    }
+
+    /**
+     * Detects whether the message pattern has been fully processed or if an unprocessed character remains and processes
+     * it if necessary, returning the resulting position in the result char array.
+     */
+    // Profiling showed this method is important to log4j performance. Modify with care!
+    // 28 bytes (allows immediate JVM inlining: < 35 bytes) LOG4J2-1096
+    private static int handleRemainingCharIfAny(final String messagePattern, final int len, final char[] result,
+            int pos, int escapeCounter, int i) {
+        if (i == len - 1) {
+            final char curChar = messagePattern.charAt(i);
+            pos = handleLastChar(result, pos, escapeCounter, curChar);
+        }
+        return pos;
+    }
+
+    /**
+     * Processes the last unprocessed character and returns the resulting position in the result char array.
+     */
+    // Profiling showed this method is important to log4j performance. Modify with care!
+    // 28 bytes (allows immediate JVM inlining: < 35 bytes) LOG4J2-1096
+    private static int handleLastChar(final char[] result, int pos, final int escapeCounter, final char curChar) {
+        if (curChar == ESCAPE_CHAR) {
+            pos = writeUnescapedEscapeChars(escapeCounter + 1, result, pos);
+        } else {
+            pos = handleLiteralChar(result, pos, escapeCounter, curChar);
+        }
+        return pos;
+    }
+
+    /**
+     * Processes a literal char (neither an '\' escape char nor a "{}" delimiter pair) and returns the resulting
+     * position.
+     */
+    // Profiling showed this method is important to log4j performance. Modify with care!
+    // 16 bytes (allows immediate JVM inlining: < 35 bytes) LOG4J2-1096
+    private static int handleLiteralChar(final char[] result, int pos, final int escapeCounter, final char curChar) {
+        // any other char beside ESCAPE or DELIM_START/STOP-combo
+        // write unescaped escape chars
+        pos = writeUnescapedEscapeChars(escapeCounter, result, pos);
+        result[pos++] = curChar;
+        return pos;
+    }
+
+    /**
+     * Writes "{}" to the specified result array at the specified position and returns the resulting position.
+     */
+    // Profiling showed this method is important to log4j performance. Modify with care!
+    // 18 bytes (allows immediate JVM inlining: < 35 bytes) LOG4J2-1096
+    private static int writeDelimPair(final char[] result, int pos) {
+        result[pos++] = DELIM_START;
+        result[pos++] = DELIM_STOP;
+        return pos;
+    }
+
+    /**
+     * Returns {@code true} if the specified parameter is odd.
+     */
+    // Profiling showed this method is important to log4j performance. Modify with care!
+    // 11 bytes (allows immediate JVM inlining: < 35 bytes) LOG4J2-1096
+    private static boolean isOdd(final int number) {
+        return (number & 1) == 1;
+    }
+
+    /**
+     * Writes a '\' char to the specified result array (starting at the specified position) for each <em>pair</em> of
+     * '\' escape chars encountered in the message format and returns the resulting position.
+     */
+    // Profiling showed this method is important to log4j performance. Modify with care!
+    // 11 bytes (allows immediate JVM inlining: < 35 bytes) LOG4J2-1096
+    private static int writeEscapedEscapeChars(final int escapeCounter, final char[] result, final int pos) {
+        final int escapedEscapes = escapeCounter >> 1; // divide by two
+        return writeUnescapedEscapeChars(escapedEscapes, result, pos);
+    }
+
+    /**
+     * Writes the specified number of '\' chars to the specified result array (starting at the specified position) and
+     * returns the resulting position.
+     */
+    // Profiling showed this method is important to log4j performance. Modify with care!
+    // 20 bytes (allows immediate JVM inlining: < 35 bytes) LOG4J2-1096
+    private static int writeUnescapedEscapeChars(int escapeCounter, char[] result, int pos) {
+        while (escapeCounter > 0) {
+            result[pos++] = ESCAPE_CHAR;
+            escapeCounter--;
+        }
+        return pos;
+    }
+
+    /**
+     * Appends the argument at the specified argument index (or, if no such argument exists, the "{}" delimiter pair) to
+     * the specified result char array at the specified position and returns the resulting position.
+     */
+    // Profiling showed this method is important to log4j performance. Modify with care!
+    // 25 bytes (allows immediate JVM inlining: < 35 bytes) LOG4J2-1096
+    private static int writeArgOrDelimPair(final String[] arguments, final int currentArgument, final char[] result,
+            int pos) {
+        if (currentArgument < arguments.length) {
+            pos = writeArgAt0(arguments, currentArgument, result, pos);
+        } else {
+            pos = writeDelimPair(result, pos);
+        }
+        return pos;
+    }
+
+    /**
+     * Appends the argument at the specified argument index to the specified result char array at the specified position
+     * and returns the resulting position.
+     */
+    // Profiling showed this method is important to log4j performance. Modify with care!
+    // 30 bytes (allows immediate JVM inlining: < 35 bytes) LOG4J2-1096
+    private static int writeArgAt0(final String[] arguments, final int currentArgument, final char[] result,
+            final int pos) {
+        final String arg = String.valueOf(arguments[currentArgument]);
+        int argLen = arg.length();
+        arg.getChars(0, argLen, result, pos);
+        return pos + argLen;
     }
 
     /**
@@ -394,123 +555,170 @@ public class ParameterizedMessage implements Message {
      * @param dejaVu a list of container identities that were already used.
      */
     private static void recursiveDeepToString(final Object o, final StringBuilder str, final Set<String> dejaVu) {
-        if (o == null) {
-            str.append("null");
+        if (appendStringDateOrNull(o, str)) {
             return;
         }
-        if (o instanceof String) {
-            str.append(o);
-            return;
+        if (isMaybeRecursive(o)) {
+            appendPotentiallyRecursiveValue(o, str, dejaVu);
+        } else {
+            tryObjectToString(o, str);
         }
+    }
 
+    private static boolean appendStringDateOrNull(final Object o, final StringBuilder str) {
+        if (o == null || o instanceof String) {
+            str.append(String.valueOf(o));
+            return true;
+        }
+        return appendDate(o, str);
+    }
+
+    private static boolean appendDate(final Object o, final StringBuilder str) {
+        if (!(o instanceof Date)) {
+            return false;
+        }
+        final Date date = (Date) o;
+        final SimpleDateFormat format = getSimpleDateFormat();
+        str.append(format.format(date));
+        return true;
+    }
+
+    private static SimpleDateFormat getSimpleDateFormat() {
+        // I'll leave it like this for the moment... this could probably be optimized using ThreadLocal...
+        return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
+    }
+
+    /**
+     * Returns {@code true} if the specified object is an array, a Map or a Collection.
+     */
+    private static boolean isMaybeRecursive(final Object o) {
+        return o.getClass().isArray() || o instanceof Map || o instanceof Collection;
+    }
+
+    private static void appendPotentiallyRecursiveValue(final Object o, final StringBuilder str,
+            final Set<String> dejaVu) {
         final Class<?> oClass = o.getClass();
         if (oClass.isArray()) {
-            if (oClass == byte[].class) {
-                str.append(Arrays.toString((byte[]) o));
-            } else if (oClass == short[].class) {
-                str.append(Arrays.toString((short[]) o));
-            } else if (oClass == int[].class) {
-                str.append(Arrays.toString((int[]) o));
-            } else if (oClass == long[].class) {
-                str.append(Arrays.toString((long[]) o));
-            } else if (oClass == float[].class) {
-                str.append(Arrays.toString((float[]) o));
-            } else if (oClass == double[].class) {
-                str.append(Arrays.toString((double[]) o));
-            } else if (oClass == boolean[].class) {
-                str.append(Arrays.toString((boolean[]) o));
-            } else if (oClass == char[].class) {
-                str.append(Arrays.toString((char[]) o));
-            } else {
-                // special handling of container Object[]
-                final String id = identityToString(o);
-                if (dejaVu.contains(id)) {
-                    str.append(RECURSION_PREFIX).append(id).append(RECURSION_SUFFIX);
-                } else {
-                    dejaVu.add(id);
-                    final Object[] oArray = (Object[]) o;
-                    str.append('[');
-                    boolean first = true;
-                    for (final Object current : oArray) {
-                        if (first) {
-                            first = false;
-                        } else {
-                            str.append(", ");
-                        }
-                        recursiveDeepToString(current, str, new HashSet<>(dejaVu));
-                    }
-                    str.append(']');
-                }
-                //str.append(Arrays.deepToString((Object[]) o));
-            }
+            appendArray(o, str, dejaVu, oClass);
         } else if (o instanceof Map) {
-            // special handling of container Map
-            final String id = identityToString(o);
-            if (dejaVu.contains(id)) {
-                str.append(RECURSION_PREFIX).append(id).append(RECURSION_SUFFIX);
-            } else {
-                dejaVu.add(id);
-                final Map<?, ?> oMap = (Map<?, ?>) o;
-                str.append('{');
-                boolean isFirst = true;
-                for (final Object o1 : oMap.entrySet()) {
-                    final Map.Entry<?, ?> current = (Map.Entry<?, ?>) o1;
-                    if (isFirst) {
-                        isFirst = false;
-                    } else {
-                        str.append(", ");
-                    }
-                    final Object key = current.getKey();
-                    final Object value = current.getValue();
-                    recursiveDeepToString(key, str, new HashSet<>(dejaVu));
-                    str.append('=');
-                    recursiveDeepToString(value, str, new HashSet<>(dejaVu));
-                }
-                str.append('}');
-            }
+            appendMap(o, str, dejaVu);
         } else if (o instanceof Collection) {
-            // special handling of container Collection
+            appendCollection(o, str, dejaVu);
+        }
+    }
+
+    private static void appendArray(final Object o, final StringBuilder str, final Set<String> dejaVu,
+            final Class<?> oClass) {
+        if (oClass == byte[].class) {
+            str.append(Arrays.toString((byte[]) o));
+        } else if (oClass == short[].class) {
+            str.append(Arrays.toString((short[]) o));
+        } else if (oClass == int[].class) {
+            str.append(Arrays.toString((int[]) o));
+        } else if (oClass == long[].class) {
+            str.append(Arrays.toString((long[]) o));
+        } else if (oClass == float[].class) {
+            str.append(Arrays.toString((float[]) o));
+        } else if (oClass == double[].class) {
+            str.append(Arrays.toString((double[]) o));
+        } else if (oClass == boolean[].class) {
+            str.append(Arrays.toString((boolean[]) o));
+        } else if (oClass == char[].class) {
+            str.append(Arrays.toString((char[]) o));
+        } else {
+            // special handling of container Object[]
             final String id = identityToString(o);
             if (dejaVu.contains(id)) {
                 str.append(RECURSION_PREFIX).append(id).append(RECURSION_SUFFIX);
             } else {
                 dejaVu.add(id);
-                final Collection<?> oCol = (Collection<?>) o;
+                final Object[] oArray = (Object[]) o;
                 str.append('[');
-                boolean isFirst = true;
-                for (final Object anOCol : oCol) {
-                    if (isFirst) {
-                        isFirst = false;
+                boolean first = true;
+                for (final Object current : oArray) {
+                    if (first) {
+                        first = false;
                     } else {
                         str.append(", ");
                     }
-                    recursiveDeepToString(anOCol, str, new HashSet<>(dejaVu));
+                    recursiveDeepToString(current, str, new HashSet<>(dejaVu));
                 }
                 str.append(']');
             }
-        } else if (o instanceof Date) {
-            final Date date = (Date) o;
-            final SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
-            // I'll leave it like this for the moment... this could probably be optimized using ThreadLocal...
-            str.append(format.format(date));
-        } else {
-            // it's just some other Object, we can only use toString().
-            try {
-                str.append(o.toString());
-            } catch (final Throwable t) {
-                str.append(ERROR_PREFIX);
-                str.append(identityToString(o));
-                str.append(ERROR_SEPARATOR);
-                final String msg = t.getMessage();
-                final String className = t.getClass().getName();
-                str.append(className);
-                if (!className.equals(msg)) {
-                    str.append(ERROR_MSG_SEPARATOR);
-                    str.append(msg);
-                }
-                str.append(ERROR_SUFFIX);
-            }
+            //str.append(Arrays.deepToString((Object[]) o));
         }
+    }
+
+    private static void appendMap(final Object o, final StringBuilder str, final Set<String> dejaVu) {
+        // special handling of container Map
+        final String id = identityToString(o);
+        if (dejaVu.contains(id)) {
+            str.append(RECURSION_PREFIX).append(id).append(RECURSION_SUFFIX);
+        } else {
+            dejaVu.add(id);
+            final Map<?, ?> oMap = (Map<?, ?>) o;
+            str.append('{');
+            boolean isFirst = true;
+            for (final Object o1 : oMap.entrySet()) {
+                final Map.Entry<?, ?> current = (Map.Entry<?, ?>) o1;
+                if (isFirst) {
+                    isFirst = false;
+                } else {
+                    str.append(", ");
+                }
+                final Object key = current.getKey();
+                final Object value = current.getValue();
+                recursiveDeepToString(key, str, new HashSet<>(dejaVu));
+                str.append('=');
+                recursiveDeepToString(value, str, new HashSet<>(dejaVu));
+            }
+            str.append('}');
+        }
+    }
+
+    private static void appendCollection(final Object o, final StringBuilder str, final Set<String> dejaVu) {
+        // special handling of container Collection
+        final String id = identityToString(o);
+        if (dejaVu.contains(id)) {
+            str.append(RECURSION_PREFIX).append(id).append(RECURSION_SUFFIX);
+        } else {
+            dejaVu.add(id);
+            final Collection<?> oCol = (Collection<?>) o;
+            str.append('[');
+            boolean isFirst = true;
+            for (final Object anOCol : oCol) {
+                if (isFirst) {
+                    isFirst = false;
+                } else {
+                    str.append(", ");
+                }
+                recursiveDeepToString(anOCol, str, new HashSet<>(dejaVu));
+            }
+            str.append(']');
+        }
+    }
+
+    private static void tryObjectToString(final Object o, final StringBuilder str) {
+        // it's just some other Object, we can only use toString().
+        try {
+            str.append(o.toString());
+        } catch (final Throwable t) {
+            handleErrorInObjectToString(o, str, t);
+        }
+    }
+
+    private static void handleErrorInObjectToString(final Object o, final StringBuilder str, final Throwable t) {
+        str.append(ERROR_PREFIX);
+        str.append(identityToString(o));
+        str.append(ERROR_SEPARATOR);
+        final String msg = t.getMessage();
+        final String className = t.getClass().getName();
+        str.append(className);
+        if (!className.equals(msg)) {
+            str.append(ERROR_MSG_SEPARATOR);
+            str.append(msg);
+        }
+        str.append(ERROR_SUFFIX);
     }
 
     /**

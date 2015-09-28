@@ -29,6 +29,28 @@ public final class Strings {
     public static final String EMPTY = "";
 
     private Strings() {
+        // empty
+    }
+
+    /**
+     * Returns a double quoted string.
+     * 
+     * @param str a String
+     * @return {@code "str"}
+     */
+    public static String dquote(final String str) {
+        return Chars.DQUOTE + str + Chars.DQUOTE;
+    }
+
+    /**
+     * Checks if a String is blank. A blank string is one that is {@code null}, empty, or when trimmed using
+     * {@link String#trim()} is empty.
+     *
+     * @param s the String to check, may be {@code null}
+     * @return {@code true} if the String is {@code null}, empty, or trims to empty.
+     */
+    public static boolean isBlank(final String s) {
+        return s == null || s.trim().isEmpty();
     }
 
     /**
@@ -53,12 +75,21 @@ public final class Strings {
      * Copied from Apache Commons Lang org.apache.commons.lang3.StringUtils.isEmpty(CharSequence)
      * </p>
      *
-     * @param cs
-     *        the CharSequence to check, may be null
+     * @param cs the CharSequence to check, may be null
      * @return {@code true} if the CharSequence is empty or null
      */
     public static boolean isEmpty(final CharSequence cs) {
         return cs == null || cs.length() == 0;
+    }
+
+    /**
+     * Checks if a String is not blank. The opposite of {@link #isBlank(String)}.
+     *
+     * @param s the String to check, may be {@code null}
+     * @return {@code true} if the String is non-{@code null} and has content after being trimmed.
+     */
+    public static boolean isNotBlank(final String s) {
+        return !isBlank(s);
     }
 
     /**
@@ -78,8 +109,7 @@ public final class Strings {
      * Copied from Apache Commons Lang org.apache.commons.lang3.StringUtils.isNotEmpty(CharSequence)
      * </p>
      *
-     * @param cs
-     *        the CharSequence to check, may be null
+     * @param cs the CharSequence to check, may be null
      * @return {@code true} if the CharSequence is not empty and not null
      */
     public static boolean isNotEmpty(final CharSequence cs) {
@@ -87,26 +117,13 @@ public final class Strings {
     }
 
     /**
-     * Checks if a String is blank. A blank string is one that is {@code null}, empty, or when trimmed using
-     * {@link String#trim()} is empty.
-     *
-     * @param s
-     *        the String to check, may be {@code null}
-     * @return {@code true} if the String is {@code null}, empty, or trims to empty.
+     * Returns a quoted string.
+     * 
+     * @param str a String
+     * @return {@code 'str'}
      */
-    public static boolean isBlank(final String s) {
-        return s == null || s.trim().isEmpty();
-    }
-
-    /**
-     * Checks if a String is not blank. The opposite of {@link #isBlank(String)}.
-     *
-     * @param s
-     *        the String to check, may be {@code null}
-     * @return {@code true} if the String is non-{@code null} and has content after being trimmed.
-     */
-    public static boolean isNotBlank(final String s) {
-        return !isBlank(s);
+    public static String quote(final String str) {
+        return Chars.QUOTE + str + Chars.QUOTE;
     }
 
     /**
@@ -130,34 +147,11 @@ public final class Strings {
      * Copied from Apache Commons Lang org.apache.commons.lang3.StringUtils.trimToNull(String)
      * </p>
      *
-     * @param str
-     *        the String to be trimmed, may be null
+     * @param str the String to be trimmed, may be null
      * @return the trimmed String, {@code null} if only chars &lt;= 32, empty or null String input
      */
     public static String trimToNull(final String str) {
         final String ts = str == null ? null : str.trim();
         return isEmpty(ts) ? null : ts;
-    }
-
-    /**
-     * Returns a quoted string.
-     * 
-     * @param str
-     *        a String
-     * @return {@code 'str'}
-     */
-    public static String quote(final String str) {
-        return Chars.QUOTE + str + Chars.QUOTE;
-    }
-
-    /**
-     * Returns a double quoted string.
-     * 
-     * @param str
-     *        a String
-     * @return {@code "str"}
-     */
-    public static String dquote(final String str) {
-        return Chars.DQUOTE + str + Chars.DQUOTE;
     }
 }

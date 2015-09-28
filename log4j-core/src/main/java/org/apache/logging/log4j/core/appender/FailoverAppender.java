@@ -76,15 +76,17 @@ public final class FailoverAppender extends AbstractAppender {
     public void start() {
         final Map<String, Appender> map = config.getAppenders();
         int errors = 0;
-        if (map.containsKey(primaryRef)) {
-            primary = new AppenderControl(map.get(primaryRef), null, null);
+        final Appender appender = map.get(primaryRef);
+        if (appender != null) {
+            primary = new AppenderControl(appender, null, null);
         } else {
             LOGGER.error("Unable to locate primary Appender " + primaryRef);
             ++errors;
         }
         for (final String name : failovers) {
-            if (map.containsKey(name)) {
-                failoverAppenders.add(new AppenderControl(map.get(name), null, null));
+            final Appender foAppender = map.get(name);
+            if (foAppender != null) {
+                failoverAppenders.add(new AppenderControl(foAppender, null, null));
             } else {
                 LOGGER.error("Failover appender " + name + " is not configured");
             }
@@ -128,7 +130,7 @@ public final class FailoverAppender extends AbstractAppender {
 
     private void failover(final LogEvent event, final Exception ex) {
         final RuntimeException re = ex != null ?
-                (ex instanceof LoggingException ? (LoggingException)ex : new LoggingException(ex)) : null;
+                (ex instanceof LoggingException ? (LoggingException) ex : new LoggingException(ex)) : null;
         boolean written = false;
         Exception failoverException = null;
         for (final AppenderControl control : failoverAppenders) {

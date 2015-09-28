@@ -28,6 +28,9 @@
         Some Log4J features depend on external libraries. This page lists the required and optional
         dependencies.
       </p>
+      <p>
+        As of version 2.4, Log4J requires Java 7. Versions 2.3 and earlier require Java 6.
+      </p>
 
       <a name="log4j-api" />
       <h4>log4j-api</h4>
@@ -49,6 +52,10 @@
           <th>Feature</th>
           <th>Requirements</th>
         </tr>
+        <tr>
+          <td>CSV Layout</td>
+          <td><a href="https://commons.apache.org/proper/commons-csv/">Apache Commons CSV</a></td>
+        </tr>        
         <tr>
           <td>XML configuration</td>
           <td>-</td>
@@ -85,6 +92,20 @@
           <td>JPA Appender</td>
           <td>the Java Persistence API classes, a JPA provider implementation, and a decorated
             entity that the user implements. It also requires an appropriate JDBC driver
+          </td>
+        </tr>
+        <tr>
+          <td>bzip2, Deflate, Pack200, and XZ compression on rollover</td>
+          <td><a href="http://commons.apache.org/proper/commons-compress/">Apache Commons Compress</a>.
+            In addition, XZ requires <a href="http://tukaani.org/xz/java.html">XZ for Java</a>.
+          </td>
+        </tr>
+        <tr>
+          <td>ZeroMQ Appender</td>
+          <td>
+            The ZeroMQ appender uses the <a href="https://github.com/zeromq/jeromq">JeroMQ</a> library which is 
+            licensed under the terms of the GNU Lesser General Public License (LGPL). For details see the 
+            files <code>COPYING</code> and <code>COPYING.LESSER</code> included with the JeroMQ distribution.  
           </td>
         </tr>
       </table>

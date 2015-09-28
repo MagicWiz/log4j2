@@ -39,6 +39,10 @@ import com.lmax.disruptor.EventFactory;
  * the life of the RingBuffer.
  */
 public class RingBufferLogEvent implements LogEvent {
+
+    /** The {@code EventFactory} for {@code RingBufferLogEvent}s. */
+    public static final Factory FACTORY = new Factory();
+
     private static final long serialVersionUID = 8462119088943934758L;
 
     /**
@@ -51,9 +55,6 @@ public class RingBufferLogEvent implements LogEvent {
             return new RingBufferLogEvent();
         }
     }
-
-    /** The {@code EventFactory} for {@code RingBufferLogEvent}s. */
-    public static final Factory FACTORY = new Factory();
 
     private transient AsyncLogger asyncLogger;
     private String loggerName;
@@ -70,11 +71,12 @@ public class RingBufferLogEvent implements LogEvent {
     private long currentTimeMillis;
     private boolean endOfBatch;
     private boolean includeLocation;
+    private long nanoTime;
 
     public void setValues(final AsyncLogger asyncLogger, final String loggerName, final Marker marker,
             final String fqcn, final Level level, final Message data, final Throwable throwable,
             final Map<String, String> map, final ContextStack contextStack, final String threadName,
-            final StackTraceElement location, final long currentTimeMillis) {
+            final StackTraceElement location, final long currentTimeMillis, final long nanoTime) {
         this.asyncLogger = asyncLogger;
         this.loggerName = loggerName;
         this.marker = marker;
@@ -88,6 +90,7 @@ public class RingBufferLogEvent implements LogEvent {
         this.threadName = threadName;
         this.location = location;
         this.currentTimeMillis = currentTimeMillis;
+        this.nanoTime = nanoTime;
     }
 
     /**
@@ -202,6 +205,11 @@ public class RingBufferLogEvent implements LogEvent {
     public long getTimeMillis() {
         return currentTimeMillis;
     }
+    
+    @Override
+    public long getNanoTime() {
+        return nanoTime;
+    }
 
     /**
      * Merges the contents of the specified map into the contextMap, after replacing any variables in the property
@@ -246,7 +254,8 @@ public class RingBufferLogEvent implements LogEvent {
                 null, // contextStack
                 null, // threadName
                 null, // location
-                0 // currentTimeMillis
+                0, // currentTimeMillis
+                0 // nanoTime
         );
     }
 
@@ -261,9 +270,29 @@ public class RingBufferLogEvent implements LogEvent {
      * @return a new immutable copy of the data in this {@code RingBufferLogEvent}
      */
     public LogEvent createMemento() {
-        // Ideally, would like to use the LogEventFactory here but signature does not match:
-        // results in factory re-creating the timestamp, context map and context stack, which we don't want.
-        return new Log4jLogEvent(loggerName, marker, fqcn, level, message, thrown, contextMap, contextStack,
-                threadName, location, currentTimeMillis);
+        final LogEvent result = new Log4jLogEvent.Builder(this).build();
+        return result;
+    }
+
+    /**
+     * Initializes the specified {@code Log4jLogEvent.Builder} from this {@code RingBufferLogEvent}.
+     * @param builder the builder whose fields to populate
+     */
+    public void initializeBuilder(Log4jLogEvent.Builder builder) {
+        builder.setContextMap(contextMap) //
+                .setContextStack(contextStack) //
+                .setEndOfBatch(endOfBatch) //
+                .setIncludeLocation(includeLocation) //
+                .setLevel(getLevel()) // ensure non-null
+                .setLoggerFqcn(fqcn) //
+                .setLoggerName(loggerName) //
+                .setMarker(marker) //
+                .setMessage(getMessage()) // ensure non-null
+                .setNanoTime(nanoTime) //
+                .setSource(location) //
+                .setThreadName(threadName) //
+                .setThrown(getThrown()) // may deserialize from thrownProxy
+                .setThrownProxy(thrownProxy) // avoid unnecessarily creating thrownProxy
+                .setTimeMillis(currentTimeMillis);        
     }
 }

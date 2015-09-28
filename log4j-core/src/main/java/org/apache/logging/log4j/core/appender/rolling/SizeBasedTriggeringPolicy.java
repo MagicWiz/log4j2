@@ -75,13 +75,17 @@ public class SizeBasedTriggeringPolicy implements TriggeringPolicy {
         this.maxFileSize = maxFileSize;
     }
 
+    public long getMaxFileSize() {
+        return maxFileSize;
+    }
+
     /**
      * Initialize the TriggeringPolicy.
-     * @param manager The RollingFileManager.
+     * @param aManager The RollingFileManager.
      */
     @Override
-    public void initialize(final RollingFileManager manager) {
-        this.manager = manager;
+    public void initialize(final RollingFileManager aManager) {
+        this.manager = aManager;
     }
 
 
@@ -157,4 +161,5 @@ public class SizeBasedTriggeringPolicy implements TriggeringPolicy {
         LOGGER.error("Unable to parse bytes: " + string);
         return MAX_FILE_SIZE;
     }
+
 }

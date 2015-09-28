@@ -27,6 +27,38 @@ import org.apache.logging.log4j.core.LogEvent;
 public abstract class AbstractStringLayout extends AbstractLayout<String> {
 
     private static final long serialVersionUID = 1L;
+    protected static final int DEFAULT_STRING_BUILDER_SIZE = 1024;
+
+    /**
+     * Converts a String to a byte[].
+     * 
+     * @param str
+     *            if null, return null.
+     * @param charset
+     *            if null, use the default charset.
+     * @return a byte[]
+     */
+    static byte[] toBytes(final String str, final Charset charset) {
+        if (str != null) {
+            return str.getBytes(charset != null ? charset : Charset.defaultCharset());
+        }
+        return null;
+    }
+
+    protected static ThreadLocal<StringBuilder> newStringBuilderThreadLocal() {
+        return new ThreadLocal<StringBuilder>() {
+            @Override
+            protected StringBuilder initialValue() {
+                return new StringBuilder(DEFAULT_STRING_BUILDER_SIZE);
+            }        
+        };
+    }
+
+    protected static StringBuilder prepareStringBuilder(ThreadLocal<StringBuilder> threadLocal) {
+        final StringBuilder buf = threadLocal.get();
+        buf.setLength(0);
+        return buf;
+    }
 
     /**
      * The charset for the formatted message.
@@ -70,4 +102,5 @@ public abstract class AbstractStringLayout extends AbstractLayout<String> {
     public byte[] toByteArray(final LogEvent event) {
         return toSerializable(event).getBytes(charset);
     }
+
 }

@@ -36,7 +36,7 @@ import static org.junit.Assert.*;
  * StatusLogger will be set to the debug level. This allows for more debug messages as the StatusLogger will be in the
  * error level until a configuration file has been read and parsed into a tree of Nodes.
  */
-public class InitialLoggerContext implements TestRule {
+public class LoggerContextRule implements TestRule {
 
     private final String configLocation;
 
@@ -44,7 +44,7 @@ public class InitialLoggerContext implements TestRule {
 
     private String testClassName;
 
-    public InitialLoggerContext(final String configLocation) {
+    public LoggerContextRule(final String configLocation) {
         this.configLocation = configLocation;
     }
 
@@ -117,6 +117,17 @@ public class InitialLoggerContext implements TestRule {
     }
 
     /**
+     * Gets a named Appender for this LoggerContext.
+     * @param <T> The target Appender class
+     * @param name the name of the Appender to look up.
+     * @param cls The target Appender class
+     * @return the named Appender or {@code null} if it wasn't defined in the configuration.
+     */
+    public <T extends Appender> T getAppender(final String name, Class<T> cls) {
+        return cls.cast(getConfiguration().getAppenders().get(name));
+    }
+
+    /**
      * Gets a named Appender or throws an exception for this LoggerContext.
      * @param name the name of the Appender to look up.
      * @return the named Appender.
@@ -124,6 +135,20 @@ public class InitialLoggerContext implements TestRule {
      */
     public Appender getRequiredAppender(final String name) {
         final Appender appender = getAppender(name);
+        assertNotNull("Appender named " + name + " was null.", appender);
+        return appender;
+    }
+
+    /**
+     * Gets a named Appender or throws an exception for this LoggerContext.
+     * @param <T> The target Appender class
+     * @param name the name of the Appender to look up.
+     * @param cls The target Appender class
+     * @return the named Appender.
+     * @throws AssertionError if the Appender doesn't exist.
+     */
+    public <T extends Appender> T getRequiredAppender(final String name, Class<T> cls) {
+        final T appender = getAppender(name, cls);
         assertNotNull("Appender named " + name + " was null.", appender);
         return appender;
     }

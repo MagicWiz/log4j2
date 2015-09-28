@@ -18,12 +18,14 @@
 package org.apache.logging.log4j.jul;
 
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.logging.log4j.test.appender.ListAppender;
+import org.apache.logging.log4j.util.Strings;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -61,6 +63,21 @@ public class CoreLoggerTest extends AbstractLoggerTest {
     }
 
     @Test
+    public void testRootSetLevelToNull() throws Exception {
+        final Logger rootLogger = Logger.getLogger(Strings.EMPTY);
+        assertThat(rootLogger.getLevel(), equalTo(Level.SEVERE));
+        assertThat(rootLogger.isLoggable(Level.SEVERE), is(true));
+        // null test
+        rootLogger.setLevel(null);
+        assertThat(rootLogger.getLevel(), equalTo(null));
+        assertThat(rootLogger.isLoggable(Level.SEVERE), is(true));
+        // now go back to a different one
+        rootLogger.setLevel(Level.INFO);
+        assertThat(rootLogger.getLevel(), equalTo(Level.INFO));
+        assertThat(rootLogger.isLoggable(Level.FINE), is(false));
+    }
+
+    @Test
     public void testSetLevel() throws Exception {
         final Logger childLogger = Logger.getLogger(LOGGER_NAME + ".Child");
         assertThat(childLogger.getLevel(), equalTo(Level.FINE));
@@ -72,5 +89,25 @@ public class CoreLoggerTest extends AbstractLoggerTest {
         logger.setLevel(Level.FINE);
         assertThat(logger.getLevel(), equalTo(Level.FINE));
         assertThat(childLogger.getLevel(), equalTo(Level.FINE));
+        assertThat(childLogger.isLoggable(Level.ALL), is(false));
     }
+
+    @Test
+    public void testSetLevelToNull() throws Exception {
+        final Logger childLogger = Logger.getLogger(LOGGER_NAME + ".NullChild");
+        assertThat(childLogger.getLevel(), equalTo(Level.FINE));
+        assertThat(childLogger.isLoggable(Level.FINE), is(true));
+        childLogger.setLevel(Level.SEVERE);
+        assertThat(childLogger.getLevel(), equalTo(Level.SEVERE));
+        assertThat(childLogger.isLoggable(Level.FINE), is(false));
+        // null test
+        childLogger.setLevel(null);
+        assertThat(childLogger.getLevel(), equalTo(null));
+        assertThat(childLogger.isLoggable(Level.FINE), is(true));
+        // now go back
+        childLogger.setLevel(Level.SEVERE);
+        assertThat(childLogger.getLevel(), equalTo(Level.SEVERE));
+        assertThat(childLogger.isLoggable(Level.FINE), is(false));
+    }
+
 }

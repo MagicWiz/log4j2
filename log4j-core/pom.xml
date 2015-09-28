@@ -21,7 +21,7 @@
   <parent>
     <groupId>org.apache.logging.log4j</groupId>
     <artifactId>log4j</artifactId>
-    <version>2.4-SNAPSHOT</version>
+    <version>2.4.1-SNAPSHOT</version>
     <relativePath>../</relativePath>
   </parent>
   <artifactId>log4j-core</artifactId>
@@ -75,6 +75,7 @@
       <artifactId>jackson-dataformat-xml</artifactId>
       <optional>true</optional>
     </dependency>
+    <!-- POM for jackson-dataformat-xml 2.5.4 depends on woodstox-core-asl 4.3.0 -->
     <dependency>
       <groupId>org.codehaus.woodstox</groupId>
       <artifactId>woodstox-core-asl</artifactId>
@@ -105,6 +106,30 @@
       <groupId>org.jboss.spec.javax.jms</groupId>
       <artifactId>jboss-jms-api_1.1_spec</artifactId>
       <scope>provided</scope>
+      <optional>true</optional>
+    </dependency>
+    <!-- Used for Kafka appender -->
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <!-- Used for ZeroMQ JeroMQ appender -->
+    <dependency>
+      <groupId>org.zeromq</groupId>
+      <artifactId>jeromq</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <!-- Used for compressing to formats other than zip and gz -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-compress</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <!-- Used for the CSV layout -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-csv</artifactId>
       <optional>true</optional>
     </dependency>
 
@@ -367,6 +392,7 @@
           <links>
             <link>http://docs.oracle.com/javaee/6/api/</link>
             <link>http://www.osgi.org/javadoc/r4v43/core/</link>
+            <link>https://commons.apache.org/proper/commons-lang/javadocs/api-release/</link>
           </links>
           <groups>
             <group>

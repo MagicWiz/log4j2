@@ -155,7 +155,6 @@ public class PluginBuilder implements Builder<Object> {
                 Modifier.isStatic(method.getModifiers()) &&
                 TypeUtil.isAssignable(Builder.class, method.getGenericReturnType())) {
                 ReflectionUtil.makeAccessible(method);
-                @SuppressWarnings("unchecked")
                 final Builder<?> builder = (Builder<?>) method.invoke(null);
                 LOGGER.debug("Found builder factory method [{}]: {}.", method.getName(), method);
                 return builder;
@@ -304,7 +303,6 @@ public class PluginBuilder implements Builder<Object> {
                     sb.append(", ");
                 }
                 StringBuilders.appendDqValue(sb, key);
-
             }
             LOGGER.error(sb.toString());
         }

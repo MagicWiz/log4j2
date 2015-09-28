@@ -99,7 +99,7 @@ public class AbstractLifeCycle implements LifeCycle, Serializable {
     protected void setState(final LifeCycle.State newState) {
         this.state = newState;
         // Need a better string than this.toString() for the message
-        // LOGGER.debug("{} {}", this.state, this);
+        // LOGGER.trace("{} {}", this.state, this);
     }
 
     protected void setStopped() {
@@ -108,6 +108,11 @@ public class AbstractLifeCycle implements LifeCycle, Serializable {
 
     protected void setStopping() {
         this.setState(LifeCycle.State.STOPPING);
+    }
+
+    @Override
+    public void initialize() {
+        this.state = State.INITIALIZED;
     }
 
     @Override

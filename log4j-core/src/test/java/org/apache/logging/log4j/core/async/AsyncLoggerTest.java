@@ -25,6 +25,7 @@ import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.CoreLoggerContexts;
 import org.apache.logging.log4j.core.config.ConfigurationFactory;
 import org.apache.logging.log4j.core.util.Constants;
+import org.apache.logging.log4j.core.util.DummyNanoClock;
 import org.apache.logging.log4j.util.Strings;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -66,6 +67,11 @@ public class AsyncLoggerTest {
 
         final String location = "testAsyncLogWritesToLog";
         assertTrue("no location", !line1.contains(location));
+    }
+    
+    @Test
+    public void testNanoClockInitiallyDummy() {
+        assertTrue(AsyncLogger.getNanoClock() instanceof DummyNanoClock);
     }
 
 }

@@ -34,7 +34,6 @@ import org.apache.logging.log4j.core.lookup.Interpolator;
 import org.apache.logging.log4j.core.lookup.StrSubstitutor;
 import org.apache.logging.log4j.core.selector.ContextSelector;
 import org.apache.logging.log4j.core.selector.NamedContextSelector;
-import org.apache.logging.log4j.core.util.FileUtils;
 import org.apache.logging.log4j.core.util.Loader;
 import org.apache.logging.log4j.core.util.NetUtils;
 import org.apache.logging.log4j.core.util.SetUtils;
@@ -195,7 +194,7 @@ final class Log4jWebInitializerImpl extends AbstractLifeCycle implements Log4jWe
         }
         if (location != null) {
             try {
-                final URI correctedFilePathUri = FileUtils.getCorrectedFilePathUri(location);
+                final URI correctedFilePathUri = NetUtils.toURI(location);
                 LOGGER.debug("getConfigURI found [{}] in servletConext at [{}]", correctedFilePathUri, location);
                 return correctedFilePathUri;
             } catch (final Exception e) {

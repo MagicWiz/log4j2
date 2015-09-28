@@ -19,10 +19,13 @@ package org.apache.logging.log4j.core.appender.rolling;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.Deflater;
 
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.appender.rolling.action.Action;
+import org.apache.logging.log4j.core.appender.rolling.action.CommonsCompressAction;
 import org.apache.logging.log4j.core.appender.rolling.action.FileRenameAction;
 import org.apache.logging.log4j.core.appender.rolling.action.GzCompressAction;
 import org.apache.logging.log4j.core.appender.rolling.action.ZipCompressAction;
@@ -77,8 +80,98 @@ import org.apache.logging.log4j.status.StatusLogger;
 @Plugin(name = "DefaultRolloverStrategy", category = "Core", printObject = true)
 public class DefaultRolloverStrategy implements RolloverStrategy {
 
-    private static final String EXT_ZIP = ".zip";
-    private static final String EXT_GZIP = ".gz";
+    /**
+     * Enumerates over supported file extensions.
+     * <p>
+     * Package-protected for unit tests.
+     */
+    enum FileExtensions {
+        ZIP(".zip") {
+            @Override
+            Action createCompressAction(final String renameTo, final String compressedName,
+                    final boolean deleteSource, final int compressionLevel) {
+                return new ZipCompressAction(source(renameTo), target(compressedName), deleteSource, compressionLevel);
+            }
+        },
+        GZ(".gz") {
+            @Override
+            Action createCompressAction(final String renameTo, final String compressedName,
+                    final boolean deleteSource, final int compressionLevel) {
+                return new GzCompressAction(source(renameTo), target(compressedName), deleteSource);
+            }
+        },
+        BZIP2(".bz2") {
+            @Override
+            Action createCompressAction(final String renameTo, final String compressedName,
+                    final boolean deleteSource, final int compressionLevel) {
+                // One of "gz", "bzip2", "xz", "pack200", or "deflate".
+                return new CommonsCompressAction("bzip2", source(renameTo), target(compressedName), deleteSource);
+            }            
+        },
+        DEFLATE(".deflate") {
+            @Override
+            Action createCompressAction(final String renameTo, final String compressedName,
+                    final boolean deleteSource, final int compressionLevel) {
+                // One of "gz", "bzip2", "xz", "pack200", or "deflate".
+                return new CommonsCompressAction("deflate", source(renameTo), target(compressedName), deleteSource);
+            }            
+        },
+        PACK200(".pack200") {
+            @Override
+            Action createCompressAction(final String renameTo, final String compressedName,
+                    final boolean deleteSource, final int compressionLevel) {
+                // One of "gz", "bzip2", "xz", "pack200", or "deflate".
+                return new CommonsCompressAction("pack200", source(renameTo), target(compressedName), deleteSource);
+            }            
+        },
+        XY(".xy") {
+            @Override
+            Action createCompressAction(final String renameTo, final String compressedName,
+                    final boolean deleteSource, final int compressionLevel) {
+                // One of "gz", "bzip2", "xz", "pack200", or "deflate".
+                return new CommonsCompressAction("xy", source(renameTo), target(compressedName), deleteSource);
+            }            
+        };
+
+        private final String extension;
+
+        private FileExtensions(final String extension) {
+            Objects.requireNonNull(extension, "extension");
+            this.extension = extension;
+        }
+
+        String getExtension() {
+            return extension;
+        }
+
+        boolean isExtensionFor(final String s) {
+            return s.endsWith(this.extension);
+        }
+
+        int length() {
+            return extension.length();
+        }
+        
+        File source(String fileName) {
+            return new File(fileName);
+        }
+        
+        File target(String fileName) {
+            return new File(fileName);
+        }
+
+        abstract Action createCompressAction(String renameTo, String compressedName, boolean deleteSource,
+                int compressionLevel);
+
+        static FileExtensions lookup(String fileExtension) {
+            for (FileExtensions ext : values()) {
+                if (ext.isExtensionFor(fileExtension)) {
+                    return ext;
+                }
+            }
+            return null;
+        }
+    };
 
     /**
      * Allow subclasses access to the status logger without creating another instance.
@@ -144,7 +237,8 @@ public class DefaultRolloverStrategy implements RolloverStrategy {
      * @param minIndex The minimum index.
      * @param maxIndex The maximum index.
      */
-    protected DefaultRolloverStrategy(final int minIndex, final int maxIndex, final boolean useMax, final int compressionLevel, final StrSubstitutor subst) {
+    protected DefaultRolloverStrategy(final int minIndex, final int maxIndex, final boolean useMax,
+            final int compressionLevel, final StrSubstitutor subst) {
         this.minIndex = minIndex;
         this.maxIndex = maxIndex;
         this.useMax = useMax;
@@ -179,22 +273,13 @@ public class DefaultRolloverStrategy implements RolloverStrategy {
      * @return true if purge was successful and rollover should be attempted.
      */
     private int purgeAscending(final int lowIndex, final int highIndex, final RollingFileManager manager) {
-        int suffixLength = 0;
-
         final List<FileRenameAction> renames = new ArrayList<>();
         final StringBuilder buf = new StringBuilder();
 
         // LOG4J2-531: directory scan & rollover must use same format
         manager.getPatternProcessor().formatFileName(subst, buf, highIndex);
-
         String highFilename = subst.replace(buf);
-
-        if (highFilename.endsWith(EXT_GZIP)) {
-            suffixLength = EXT_GZIP.length();
-        } else if (highFilename.endsWith(EXT_ZIP)) {
-            suffixLength = EXT_ZIP.length();
-        }
-
+        final int suffixLength = suffixLength(highFilename);
         int maxIndex = 0;
 
         for (int i = highIndex; i >= lowIndex; i--) {
@@ -296,8 +381,6 @@ public class DefaultRolloverStrategy implements RolloverStrategy {
      * @return true if purge was successful and rollover should be attempted.
      */
     private int purgeDescending(final int lowIndex, final int highIndex, final RollingFileManager manager) {
-        int suffixLength = 0;
-
         final List<FileRenameAction> renames = new ArrayList<>();
         final StringBuilder buf = new StringBuilder();
 
@@ -305,12 +388,7 @@ public class DefaultRolloverStrategy implements RolloverStrategy {
         manager.getPatternProcessor().formatFileName(subst, buf, lowIndex);
 
         String lowFilename = subst.replace(buf);
-
-        if (lowFilename.endsWith(EXT_GZIP)) {
-            suffixLength = EXT_GZIP.length();
-        } else if (lowFilename.endsWith(EXT_ZIP)) {
-            suffixLength = EXT_ZIP.length();
-        }
+        final int suffixLength = suffixLength(lowFilename);
 
         for (int i = lowIndex; i <= highIndex; i++) {
             File toRename = new File(lowFilename);
@@ -388,6 +466,15 @@ public class DefaultRolloverStrategy implements RolloverStrategy {
         return lowIndex;
     }
 
+    private int suffixLength(final String lowFilename) {
+        for (FileExtensions extension : FileExtensions.values()) {
+            if (extension.isExtensionFor(lowFilename)) {
+                return extension.length();
+            }
+        }
+        return 0;
+    }
+
     /**
      * Perform the rollover.
      * @param manager The RollingFileManager name for current active log file.
@@ -399,14 +486,14 @@ public class DefaultRolloverStrategy implements RolloverStrategy {
         if (maxIndex < 0) {
             return null;
         }
-        final long start = System.nanoTime();
+        final long startNanos = System.nanoTime();
         final int fileIndex = purge(minIndex, maxIndex, manager);
         if (fileIndex < 0) {
             return null;
         }
         if (LOGGER.isTraceEnabled()) {
-            final double duration = (System.nanoTime() - start) / (1000.0 * 1000.0 * 1000.0);
-            LOGGER.trace("DefaultRolloverStrategy.purge() took {} seconds", duration);
+            final double durationMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+            LOGGER.trace("DefaultRolloverStrategy.purge() took {} milliseconds", durationMillis);
         }
         final StringBuilder buf = new StringBuilder(255);
         manager.getPatternProcessor().formatFileName(subst, buf, fileIndex);
@@ -416,13 +503,12 @@ public class DefaultRolloverStrategy implements RolloverStrategy {
         final String compressedName = renameTo;
         Action compressAction = null;
 
-        if (renameTo.endsWith(EXT_GZIP)) {
-            renameTo = renameTo.substring(0, renameTo.length() - EXT_GZIP.length());
-            compressAction = new GzCompressAction(new File(renameTo), new File(compressedName), true);
-        } else if (renameTo.endsWith(EXT_ZIP)) {
-            renameTo = renameTo.substring(0, renameTo.length() - EXT_ZIP.length());
-            compressAction = new ZipCompressAction(new File(renameTo), new File(compressedName), true,
-                    compressionLevel);
+        for (FileExtensions ext : FileExtensions.values()) { // LOG4J2-1077 support other compression formats
+            if (ext.isExtensionFor(renameTo)) {
+                renameTo = renameTo.substring(0, renameTo.length() - ext.length()); // LOG4J2-1135 omit extension!
+                compressAction = ext.createCompressAction(renameTo, compressedName, true, compressionLevel);
+                break;
+            }
         }
 
         final FileRenameAction renameAction =

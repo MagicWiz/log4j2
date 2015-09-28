@@ -18,8 +18,6 @@ package org.apache.logging.log4j.core;
 
 import java.util.EventListener;
 
-import org.apache.logging.log4j.LogManager;
-
 /**
  * Base class for server classes that listen to {@link LogEvent}s.
  * TODO (MS) How is this class any different from Appender?
@@ -29,7 +27,7 @@ public class LogEventListener implements EventListener {
     private final LoggerContext context;
 
     protected LogEventListener() {
-        context = (LoggerContext) LogManager.getContext(false);
+        context = LoggerContext.getContext(false);
     }
 
     public void log(final LogEvent event) {
@@ -37,8 +35,8 @@ public class LogEventListener implements EventListener {
             return;
         }
         final Logger logger = context.getLogger(event.getLoggerName());
-        if (logger.config.filter(event.getLevel(), event.getMarker(), event.getMessage(), event.getThrown())) {
-            logger.config.logEvent(event);
+        if (logger.privateConfig.filter(event.getLevel(), event.getMarker(), event.getMessage(), event.getThrown())) {
+            logger.privateConfig.logEvent(event);
         }
     }
 }

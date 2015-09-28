@@ -37,12 +37,21 @@ public class LogEventTest {
 
     @Test
     public void testSerialization() throws Exception {
-        final LogEvent event1 = new Log4jLogEvent(this.getClass().getName(), null, "org.apache.logging.log4j.core.Logger",
-            Level.INFO, new SimpleMessage("Hello, world!"), null);
+        final LogEvent event1 = Log4jLogEvent.newBuilder() //
+                .setLoggerName(this.getClass().getName()) //
+                .setLoggerFqcn("org.apache.logging.log4j.core.Logger") //
+                .setLevel(Level.INFO) //
+                .setMessage(new SimpleMessage("Hello, world!")) //
+                .build();
         final Exception parent = new IllegalStateException("Test");
         final Throwable child = new LoggingException("This is a test", parent);
-        final LogEvent event2 = new Log4jLogEvent(this.getClass().getName(), null, "org.apache.logging.log4j.core.Logger",
-            Level.INFO, new SimpleMessage("Hello, world!"), child);
+        final LogEvent event2 = Log4jLogEvent.newBuilder() //
+                .setLoggerName(this.getClass().getName()) //
+                .setLoggerFqcn("org.apache.logging.log4j.core.Logger") //
+                .setLevel(Level.INFO) //
+                .setMessage(new SimpleMessage("Hello, world!")) //
+                .setThrown(child) //
+                .build();
 
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         final ObjectOutputStream oos = new ObjectOutputStream(baos);
@@ -51,26 +60,85 @@ public class LogEventTest {
 
         final ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
         final ObjectInputStream ois = new ObjectInputStream(bais);
-        LogEvent returned;
         try {
-            returned = (LogEvent) ois.readObject();
+            ois.readObject();
         } catch (final IOException ioe) {
             fail("Exception processing event1");
         }
         try {
-            returned = (LogEvent) ois.readObject();
+            ois.readObject();
         } catch (final IOException ioe) {
             fail("Exception processing event2");
         }
     }
 
+    @Test
+    public void testNanoTimeIsNotSerialized1() throws Exception {
+        final LogEvent event1 = Log4jLogEvent.newBuilder() //
+                .setLoggerName(this.getClass().getName()) //
+                .setLoggerFqcn("org.apache.logging.log4j.core.Logger") //
+                .setLevel(Level.INFO) //
+                .setMessage(new SimpleMessage("Hello, world!")) //
+                .setThreadName("this must be initialized or the test fails") //
+                .setNanoTime(12345678L) //
+                .build();
+        final LogEvent copy = new Log4jLogEvent.Builder(event1).build();
+
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        final ObjectOutputStream oos = new ObjectOutputStream(baos);
+        oos.writeObject(event1);
+
+        final ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
+        final ObjectInputStream ois = new ObjectInputStream(bais);
+        
+        LogEvent actual = (LogEvent) ois.readObject();
+        assertNotEquals("Different event: nanoTime", copy, actual);
+        assertNotEquals("Different nanoTime", copy.getNanoTime(), actual.getNanoTime());
+        assertEquals("deserialized nanoTime is zero", 0, actual.getNanoTime());
+    }
+
+    @Test
+    public void testNanoTimeIsNotSerialized2() throws Exception {
+        final LogEvent event1 = Log4jLogEvent.newBuilder() //
+                .setLoggerName(this.getClass().getName()) //
+                .setLoggerFqcn("org.apache.logging.log4j.core.Logger") //
+                .setLevel(Level.INFO) //
+                .setMessage(new SimpleMessage("Hello, world!")) //
+                .setThreadName("this must be initialized or the test fails") //
+                .setNanoTime(0) //
+                .build();
+        final LogEvent event2 = new Log4jLogEvent.Builder(event1).build();
+
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        final ObjectOutputStream oos = new ObjectOutputStream(baos);
+        oos.writeObject(event1);
+
+        final ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
+        final ObjectInputStream ois = new ObjectInputStream(bais);
+        
+        LogEvent actual = (LogEvent) ois.readObject();
+        assertEquals("both zero nanoTime", event2, actual);
+    }
+
     public void testEquals() {
-        final LogEvent event1 = new Log4jLogEvent(this.getClass().getName(), null, "org.apache.logging.log4j.core.Logger",
-            Level.INFO, new SimpleMessage("Hello, world!"), null);
-        final LogEvent event2 = new Log4jLogEvent(this.getClass().getName(), null, "org.apache.logging.log4j.core.Logger",
-            Level.INFO, new SimpleMessage("Hello, Apache!"), null);
-        final LogEvent event3 = new Log4jLogEvent(this.getClass().getName(), null, "org.apache.logging.log4j.core.Logger",
-            Level.INFO, new SimpleMessage("Hello, Apache!"), null);
+        final LogEvent event1 = Log4jLogEvent.newBuilder() //
+                .setLoggerName(this.getClass().getName()) //
+                .setLoggerFqcn("org.apache.logging.log4j.core.Logger") //
+                .setLevel(Level.INFO) //
+                .setMessage(new SimpleMessage("Hello, world!")) //
+                .build();
+        final LogEvent event2 = Log4jLogEvent.newBuilder() //
+                .setLoggerName(this.getClass().getName()) //
+                .setLoggerFqcn("org.apache.logging.log4j.core.Logger") //
+                .setLevel(Level.INFO) //
+                .setMessage(new SimpleMessage("Hello, world!")) //
+                .build();
+        final LogEvent event3 = Log4jLogEvent.newBuilder() //
+                .setLoggerName(this.getClass().getName()) //
+                .setLoggerFqcn("org.apache.logging.log4j.core.Logger") //
+                .setLevel(Level.INFO) //
+                .setMessage(new SimpleMessage("Hello, world!")) //
+                .build();
         assertNotEquals("Events should not be equal", event1, event2);
         assertEquals("Events should be equal", event2, event3);
     }

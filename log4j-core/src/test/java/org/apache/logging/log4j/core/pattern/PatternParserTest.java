@@ -22,13 +22,13 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.MarkerManager;
 import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.Logger;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.impl.Log4jLogEvent;
 import org.apache.logging.log4j.core.util.Constants;
+import org.apache.logging.log4j.core.util.NanoClockFactory;
 import org.apache.logging.log4j.message.SimpleMessage;
 import org.junit.Before;
 import org.junit.Test;
@@ -42,7 +42,7 @@ public class PatternParserTest {
 
     static String OUTPUT_FILE   = "output/PatternParser";
     static String WITNESS_FILE  = "witness/PatternParser";
-    LoggerContext ctx = (LoggerContext) LogManager.getContext();
+    LoggerContext ctx = LoggerContext.getContext();
     Logger root = ctx.getLogger("");
 
     private static String msgPattern = "%m%n";
@@ -96,9 +96,16 @@ public class PatternParserTest {
         mdc.put("loginId", "Fred");
         final Throwable t = new Throwable();
         final StackTraceElement[] elements = t.getStackTrace();
-        final LogEvent event = new Log4jLogEvent("org.apache.logging.log4j.PatternParserTest", MarkerManager.getMarker("TEST"),
-            Logger.class.getName(), Level.INFO, new SimpleMessage("Hello, world"), null,
-            mdc, null, "Thread1", elements[0], System.currentTimeMillis());
+        final Log4jLogEvent event = Log4jLogEvent.newBuilder() //
+                .setLoggerName("org.apache.logging.log4j.PatternParserTest") //
+                .setMarker(MarkerManager.getMarker("TEST")) //
+                .setLoggerFqcn(Logger.class.getName()) //
+                .setLevel(Level.INFO) //
+                .setMessage(new SimpleMessage("Hello, world")) //
+                .setContextMap(mdc) //
+                .setThreadName("Thread1") //
+                .setSource(elements[0])
+                .setTimeMillis(System.currentTimeMillis()).build();
         final StringBuilder buf = new StringBuilder();
         for (final PatternFormatter formatter : formatters) {
             formatter.format(event, buf);
@@ -112,9 +119,14 @@ public class PatternParserTest {
     public void testPatternTruncateFromBeginning() {
         final List<PatternFormatter> formatters = parser.parse(patternTruncateFromBeginning);
         assertNotNull(formatters);
-        final LogEvent event = new Log4jLogEvent("org.apache.logging.log4j.PatternParserTest", null,
-            Logger.class.getName(), Level.INFO, new SimpleMessage("Hello, world"), null,
-            null, null, "Thread1", null, System.currentTimeMillis());
+        final LogEvent event = Log4jLogEvent.newBuilder() //
+                .setLoggerName("org.apache.logging.log4j.PatternParserTest") //
+                .setLoggerFqcn(Logger.class.getName()) //
+                .setLevel(Level.INFO) //
+                .setMessage(new SimpleMessage("Hello, world")) //
+                .setThreadName("Thread1") //
+                .setTimeMillis(System.currentTimeMillis()) //
+                .build();
         final StringBuilder buf = new StringBuilder();
         for (final PatternFormatter formatter : formatters) {
             formatter.format(event, buf);
@@ -128,9 +140,14 @@ public class PatternParserTest {
     public void testPatternTruncateFromEnd() {
         final List<PatternFormatter> formatters = parser.parse(patternTruncateFromEnd);
         assertNotNull(formatters);
-        final LogEvent event = new Log4jLogEvent("org.apache.logging.log4j.PatternParserTest", null,
-            Logger.class.getName(), Level.INFO, new SimpleMessage("Hello, world"), null,
-            null, null, "Thread1", null, System.currentTimeMillis());
+        final LogEvent event = Log4jLogEvent.newBuilder() //
+                .setLoggerName("org.apache.logging.log4j.PatternParserTest") //
+                .setLoggerFqcn(Logger.class.getName()) //
+                .setLevel(Level.INFO) //
+                .setMessage(new SimpleMessage("Hello, world")) //
+                .setThreadName("Thread1") //
+                .setTimeMillis(System.currentTimeMillis()) //
+                .build();
         final StringBuilder buf = new StringBuilder();
         for (final PatternFormatter formatter : formatters) {
             formatter.format(event, buf);
@@ -152,9 +169,15 @@ public class PatternParserTest {
         assertNotNull(formatters);
         final Throwable t = new Throwable();
         final StackTraceElement[] elements = t.getStackTrace();
-        final LogEvent event = new Log4jLogEvent("a.b.c", null,
-            Logger.class.getName(), Level.INFO, new SimpleMessage("Hello, world"), null,
-            null, null, "Thread1", elements[0], timestamp);
+        final LogEvent event = Log4jLogEvent.newBuilder() //
+                .setLoggerName("a.b.c") //
+                .setLoggerFqcn(Logger.class.getName()) //
+                .setLevel(Level.INFO) //
+                .setMessage(new SimpleMessage("Hello, world")) //
+                .setThreadName("Thread1") //
+                .setSource(elements[0]) //
+                .setTimeMillis(timestamp) //
+                .build();
         final StringBuilder buf = new StringBuilder();
         for (final PatternFormatter formatter : formatters) {
             formatter.format(event, buf);
@@ -181,9 +204,16 @@ public class PatternParserTest {
         assertNotNull(formatters);
         final Throwable t = new Throwable();
         final StackTraceElement[] stackTraceElement = t.getStackTrace();
-        final LogEvent event = new Log4jLogEvent("org.apache.logging.log4j.PatternParserTest",
-                MarkerManager.getMarker("TEST"), Logger.class.getName(), level, new SimpleMessage("Hello, world"),
-                null, null, null, "Thread1", /*stackTraceElement[0]*/null, System.currentTimeMillis());
+        final LogEvent event = Log4jLogEvent.newBuilder() //
+                .setLoggerName("org.apache.logging.log4j.PatternParserTest") //
+                .setMarker(MarkerManager.getMarker("TEST")) //
+                .setLoggerFqcn(Logger.class.getName()) //
+                .setLevel(level) //
+                .setMessage(new SimpleMessage("Hello, world")) //
+                .setThreadName("Thread1") //
+                .setSource(/*stackTraceElement[0]*/ null) //
+                .setTimeMillis(System.currentTimeMillis()) //
+                .build();
         final StringBuilder buf = new StringBuilder();
         for (final PatternFormatter formatter : formatters) {
             formatter.format(event, buf);
@@ -193,5 +223,36 @@ public class PatternParserTest {
         assertTrue("Expected to start with: " + expectedStart + ". Actual: " + str, str.startsWith(expectedStart));
         assertTrue("Expected to end with: \"" + expectedEnd + "\". Actual: \"" + str, str.endsWith(expectedEnd));
     }
-
+    
+    @Test
+    public void testNanoPatternShort() {
+        final List<PatternFormatter> formatters = parser.parse("%N");
+        assertNotNull(formatters);
+        assertEquals(1, formatters.size());
+        assertTrue(formatters.get(0).getConverter() instanceof NanoTimePatternConverter);
+    }
+    
+    @Test
+    public void testNanoPatternLong() {
+        final List<PatternFormatter> formatters = parser.parse("%nano");
+        assertNotNull(formatters);
+        assertEquals(1, formatters.size());
+        assertTrue(formatters.get(0).getConverter() instanceof NanoTimePatternConverter);
+    }
+    
+    @Test
+    public void testNanoPatternShortChangesNanoClockFactoryMode() {
+        parser.parse("%m");
+        assertEquals(NanoClockFactory.Mode.Dummy, NanoClockFactory.getMode());
+        parser.parse("%nano");
+        assertEquals(NanoClockFactory.Mode.System, NanoClockFactory.getMode());
+    }
+    
+    @Test
+    public void testNanoPatternLongChangesNanoClockFactoryMode() {
+        parser.parse("%m");
+        assertEquals(NanoClockFactory.Mode.Dummy, NanoClockFactory.getMode());
+        parser.parse("%N");
+        assertEquals(NanoClockFactory.Mode.System, NanoClockFactory.getMode());
+    }
 }

@@ -1225,6 +1225,90 @@ public class JpaLogEntity extends AbstractLogEventWrapperEntity {
     ...
 }]]></pre>
         </subsection>
+        <a name="KafkaAppender"/>
+        <subsection name="KafkaAppender">
+          <p>The KafkaAppender logs events to an <a href="https://kafka.apache.org/">Apache Kafka</a> topic.</p>
+          <table>
+            <caption align="top">KafkaAppender Parameters</caption>
+            <tr>
+              <th>Parameter Name</th>
+              <th>Type</th>
+              <th>Description</th>
+            </tr>
+            <tr>
+              <td>topic</td>
+              <td>String</td>
+              <td>The Kafka topic to use. Required.</td>
+            </tr>
+            <tr>
+              <td>filter</td>
+              <td>Filter</td>
+              <td>A Filter to determine if the event should be handled by this Appender. More than one Filter
+                may be used by using a CompositeFilter.</td>
+            </tr>
+            <tr>
+              <td>layout</td>
+              <td>Layout</td>
+              <td>
+                The Layout to use to format the LogEvent. If you do not specify a layout, the appender will send the 
+                <a class="javadoc" href="http://logging.apache.org/log4j/2.x/log4j-api/apidocs/org/apache/logging/log4j/message/Message.html#getFormattedMessage())">formatted message</a> 
+                to Kafka as a UTF-8 encoded string.
+              </td>
+            </tr>
+            <tr>
+              <td>name</td>
+              <td>String</td>
+              <td>The name of the Appender. Required.</td>
+            </tr>
+            <tr>
+              <td>ignoreExceptions</td>
+              <td>boolean</td>
+              <td>The default is <code>true</code>, causing exceptions encountered while appending events to be
+                internally logged and then ignored. When set to <code>false</code> exceptions will be propagated to the
+                caller, instead. You must set this to <code>false</code> when wrapping this Appender in a
+                <a href="#FailoverAppender">FailoverAppender</a>.</td>
+            </tr>
+            <tr>
+              <td>properties</td>
+              <td>Property[]</td>
+              <td>
+                You can set any properties in <a href="http://kafka.apache.org/documentation.html#newproducerconfigs">Kafka new producer properties</a>.
+                You need to set the <code>bootstrap.servers</code> property, there are sensible default values for the others.
+              </td>
+            </tr>
+          </table>
+          <p>
+            Here is a sample KafkaAppender configuration snippet:
+          </p>
+          <pre class="prettyprint linenums"><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+  ...
+  <Appenders>
+    <Kafka name="Kafka" topic="log-test">
+      <PatternLayout pattern="%date %message"/>
+        <Property name="bootstrap.servers">localhost:9092</Property>
+    </Kafka>
+  </Appenders>]]></pre>
+          <p>
+            This appender is synchronous and will block until the record has been acknowledged by the Kafka server, timeout for this
+            can be set with the <code>timeout.ms</code> property (defaults to 30 seconds). Wrap with
+            <a href="http://logging.apache.org/log4j/2.x/manual/appenders.html#AsyncAppender">Async appender</a> to log asynchronously.
+          </p>
+          <p>
+            This appender requires the <a href="http://search.maven.org/#artifactdetails|org.apache.kafka|kafka-clients|0.8.2.1|jar">Kafka client library</a>.
+          </p>
+          <p>
+            <em>Note:</em>Make sure to not let <code>org.apache.kafka</code> log to a Kafka appender on DEBUG level,
+            since that will cause recursive logging:
+          </p>
+          <pre class="prettyprint linenums"><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+  ...
+  <Loggers>
+    <Root level="DEBUG">
+      <AppenderRef ref="Kafka"/>
+    </Root>
+    <Logger name="org.apache.kafka" level="INFO" /> <!-- avoid recursive logging -->
+  </Loggers>]]></pre>
+        </subsection>
       <a name="MemoryMappedFileAppender" />
       <subsection name="MemoryMappedFileAppender">
         <p><i>New since 2.1. Be aware that this is a new addition, and although it has been
@@ -2146,9 +2230,12 @@ public class JpaLogEntity extends AbstractLogEventWrapperEntity {
                 is present it will be replaced with the current date and time values. If the pattern contains an integer
                 it will be incremented on each rollover. If the pattern contains both a date/time and integer
                 in the pattern the integer will be incremented until the result of the date/time pattern changes. If
-                the file pattern ends with ".gz" or ".zip" the resulting archive will be compressed using the
-                compression scheme that matches the suffix. The pattern may also contain lookup references that
-                can be resolved at runtime such as is shown in the example below.
+                the file pattern ends with ".gz", ".zip", ".bz2", ".deflate", ".pack200", or ".xz" the resulting archive 
+                will be compressed using the compression scheme that matches the suffix. The formats bzip2, Deflate, 
+                Pack200 and XZ require <a href="http://commons.apache.org/proper/commons-compress/">Apache Commons Compress</a>.
+                In addition, XZ requires <a href="http://tukaani.org/xz/java.html">XZ for Java</a>. 
+                The pattern may also contain lookup references that can be resolved at runtime such as is shown in the example 
+                below.
               </p>
               <p>The default rollover strategy supports two variations for incrementing the counter. The first is
                 the "fixed window" strategy. To illustrate how it works, suppose that the min attribute is set to 1,
@@ -2198,7 +2285,7 @@ public class JpaLogEntity extends AbstractLogEventWrapperEntity {
                     created and starts being written to.</td>
                 </tr>
               </table>
-              <p>By way of contrast, when the the fileIndex attribute is set to "max" but all the other settings
+              <p>By way of contrast, when the fileIndex attribute is set to "max" but all the other settings
                 are the same the following actions will be performed.
               </p>
               <table>
@@ -3199,6 +3286,169 @@ public class JpaLogEntity extends AbstractLogEventWrapperEntity {
     </Root>
   </Loggers>
 </Configuration>]]></pre>
+        </subsection>
+
+        <a name="JeroMQAppender"/>
+        <subsection name="ZeroMQ/JeroMQ Appender">
+          <p>
+            The ZeroMQ appender uses the <a href="https://github.com/zeromq/jeromq">JeroMQ</a> library to send log 
+            events to one or more ZeroMQ endpoints.  
+          </p>
+          <p>
+            This is a simple JeroMQ configuration:
+          </p>
+          <pre class="prettyprint linenums"><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<Configuration name="JeroMQAppenderTest" status="TRACE">
+  <Appenders>
+    <JeroMQ name="JeroMQAppender">    
+      <Property name="endpoint">tcp://*:5556</Property>
+      <Property name="endpoint">ipc://info-topic</Property>
+    </JeroMQ>
+  </Appenders>
+  <Loggers>
+    <Root level="info">
+      <AppenderRef ref="JeroMQAppender"/>
+    </Root>
+  </Loggers>
+</Configuration>]]></pre> 
+          <p>
+            The table below describes all options. Please consult the JeroMQ and ZeroMQ documentation for details.
+          </p>
+          <table>
+            <caption align="top">JeroMQ Parameters</caption>
+            <tr>
+              <th>Parameter Name</th>
+              <th>Type</th>
+              <th>Description</th>
+            </tr>
+            <tr>
+              <td>name</td>
+              <td>String</td>
+              <td>The name of the Appender. Required.</td>
+            </tr>
+            <tr>
+              <td>Layout</td>
+              <td>layout</td>
+              <td>The Layout of the Appender. If you do not specify a layout, the appender uses the default 
+              pattern appender returned by 
+              <a href="https://logging.apache.org/log4j/2.x/log4j-core/apidocs/org/apache/logging/log4j/core/layout/PatternLayout.html#createDefaultLayout()">PatternLayout.createDefaultLayout()</a>.</td>
+            </tr>
+            <tr>
+              <td>Filters</td>
+              <td>Filter</td>
+              <td>The Filter(s) of the Appender.</td>
+            </tr>
+            <tr>
+              <td>Properties</td>
+              <td>Property[]</td>
+              <td>One or more Property elements, named <code>endpoint</code>.</td>
+            </tr>
+            <tr>
+              <td>ignoreExceptions</td>
+              <td>boolean</td>
+              <td>If true, exceptions will be logged and suppressed. If false errors will be logged and then passed to the application.</td>
+            </tr>
+            <tr>
+              <td>affinity</td>
+              <td>long</td>
+              <td>The ZMQ_AFFINITY option. Defaults to 0.</td>
+            </tr>
+            <tr>
+              <td>backlog</td>
+              <td>long</td>
+              <td>The ZMQ_BACKLOG option. Defaults to 100.</td>
+            </tr>
+            <tr>
+              <td>delayAttachOnConnect</td>
+              <td>boolean</td>
+              <td>The ZMQ_DELAY_ATTACH_ON_CONNECT option. Defaults to false.</td>
+            </tr>
+            <tr>
+              <td>identity</td>
+              <td>byte[]</td>
+              <td>The ZMQ_IDENTITY option. Defaults to none.</td>
+            </tr>
+            <tr>
+              <td>ipv4Only</td>
+              <td>boolean</td>
+              <td>The ZMQ_IPV4ONLY option. Defaults to true.</td>
+            </tr>
+            <tr>
+              <td>linger</td>
+              <td>long</td>
+              <td>The ZMQ_LINGER option. Defaults to -1.</td>
+            </tr>
+            <tr>
+              <td>maxMsgSize</td>
+              <td>long</td>
+              <td>The ZMQ_MAXMSGSIZE option. Defaults to -1.</td>
+            </tr>
+            <tr>
+              <td>rcvHwm</td>
+              <td>long</td>
+              <td>The ZMQ_RCVHWM option. Defaults to 1000.</td>
+            </tr>
+            <tr>
+              <td>receiveBufferSize</td>
+              <td>long</td>
+              <td>The ZMQ_RCVBUF option. Defaults to 0.</td>
+            </tr>
+            <tr>
+              <td>receiveTimeOut</td>
+              <td>int</td>
+              <td>The ZMQ_RCVTIMEO option. Defaults to -1.</td>
+            </tr>
+            <tr>
+              <td>reconnectIVL</td>
+              <td>long</td>
+              <td>The ZMQ_RECONNECT_IVL option. Defaults to 100.</td>
+            </tr>
+            <tr>
+              <td>reconnectIVLMax</td>
+              <td>long</td>
+              <td>The ZMQ_RECONNECT_IVL_MAX option. Defaults to 0.</td>
+            </tr>
+            <tr>
+              <td>sendBufferSize</td>
+              <td>long</td>
+              <td>The ZMQ_SNDBUF option. Defaults to 0.</td>
+            </tr>
+            <tr>
+              <td>sendTimeOut</td>
+              <td>int</td>
+              <td>The ZMQ_SNDTIMEO option. Defaults to -1.</td>
+            </tr>
+            <tr>
+              <td>sndHwm</td>
+              <td>long</td>
+              <td>The ZMQ_SNDHWM option. Defaults to 1000.</td>
+            </tr>
+            <tr>
+              <td>tcpKeepAlive</td>
+              <td>int</td>
+              <td>The ZMQ_TCP_KEEPALIVE option. Defaults to -1.</td>
+            </tr>
+            <tr>
+              <td>tcpKeepAliveCount</td>
+              <td>long</td>
+              <td>The ZMQ_TCP_KEEPALIVE_CNT option. Defaults to -1.</td>
+            </tr>
+            <tr>
+              <td>tcpKeepAliveIdle</td>
+              <td>long</td>
+              <td>The ZMQ_TCP_KEEPALIVE_IDLE option. Defaults to -1.</td>
+            </tr>
+            <tr>
+              <td>tcpKeepAliveInterval</td>
+              <td>long</td>
+              <td>The ZMQ_TCP_KEEPALIVE_INTVL option. Defaults to -1.</td>
+            </tr>
+            <tr>
+              <td>xpubVerbose</td>
+              <td>boolean</td>
+              <td>The ZMQ_XPUB_VERBOSE option. Defaults to false.</td>
+            </tr>
+          </table>          
         </subsection>
 
       </section>

@@ -19,7 +19,6 @@ package org.apache.logging.log4j.core.util;
 
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.ReflectPermission;
 import java.net.URL;
 
 import org.apache.logging.log4j.Logger;
@@ -34,6 +33,9 @@ public final class Loader {
     private static final Logger LOGGER = StatusLogger.getLogger();
 
     private static final String TSTR = "Caught Exception while in Loader.getResource. This may be innocuous.";
+
+    private Loader() {
+    }
 
     /**
      * Returns the ClassLoader to use.
@@ -315,8 +317,5 @@ public final class Loader {
             LOGGER.trace("Unknown error checking for existence of class [{}].", className, e);
             return false;
         }
-    }
-
-    private Loader() {
     }
 }
